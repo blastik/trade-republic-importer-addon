@@ -1,6 +1,6 @@
 {
   "name": "trade-republic-importer-addon",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Import Trade Republic CSV exports into Wealthfolio",
   "type": "module",
   "main": "dist/addon.js",
@@ -18,8 +18,7 @@
     "dev": "vite build --watch",
     "dev:server": "wealthfolio dev",
     "clean": "rm -rf dist",
-    "package": "mkdir -p dist && zip -j dist/$npm_package_name-$npm_package_version.zip manifest.json dist/addon.js README.md",
-    "bundle": "pnpm clean && pnpm build && pnpm package",
+    "bundle": "pnpm build && zip -j dist/trade-republic-importer-addon.zip manifest.json dist/addon.js README.md",
     "lint": "tsc --noEmit",
     "type-check": "tsc --noEmit",
     "test": "vitest run",

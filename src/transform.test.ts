@@ -75,6 +75,7 @@ describe("BUY", () => {
     expect(buy.accountId).toBe("portfolio");
     expect(buy.symbol).toBe("AAPL");
     expect(buy.fee).toBe("1");
+    expect(buy.isDraft).toBe(false);
   });
 
   it("stockperk-funded BUY produces CREDIT + BUY without cash transfer", () => {
@@ -136,6 +137,7 @@ describe("SELL", () => {
     const sell = activities.find((a) => a.activityType === "SELL")!;
     expect(sell.accountId).toBe("portfolio");
     expect(sell.fee).toBe("2");
+    expect(sell.isDraft).toBe(false);
 
     const out = activities.find((a) => a.activityType === "TRANSFER_OUT")!;
     expect(out.accountId).toBe("portfolio");
@@ -166,6 +168,7 @@ describe("DELIVERY", () => {
     expect(activities).toHaveLength(1);
     expect(activities[0].activityType).toBe("TRANSFER_IN");
     expect(activities[0].accountId).toBe("portfolio");
+    expect(activities[0].isDraft).toBe(false);
   });
 
   it("MIGRATION is skipped", () => {

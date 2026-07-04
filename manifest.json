@@ -1,7 +1,7 @@
 {
   "id": "trade-republic-importer",
   "name": "Trade Republic Importer",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Import Trade Republic CSV exports into Wealthfolio. Splits cash and portfolio activities across two accounts and handles internal fund transfers automatically.",
   "author": "blastik",
   "main": "addon.js",

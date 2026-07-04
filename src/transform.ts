@@ -316,8 +316,6 @@ export function transform(rows: TrRow[], config: AddonSettings): TransformResult
         if (r.original_currency) {
           const trFx = num(r.fx_rate);
           const wfFx = trFx !== 0 ? parseFloat((1.0 / trFx).toFixed(6)) : 1;
-          // Tax is withheld in EUR; convert to the dividend's original currency for the tax field
-          const taxInOrigCcy = taxAmt ? fmtAmt(Math.abs(taxAmt) * trFx) : undefined;
           activities.push({
             accountId: portfolioAccountId,
             activityType: "DIVIDEND",
@@ -329,11 +327,13 @@ export function transform(rows: TrRow[], config: AddonSettings): TransformResult
             currency: r.original_currency,
             amount: r.original_amount,
             fxRate: String(wfFx),
-            tax: taxInOrigCcy,
             comment: `Dividend ${r.name} (${r.original_amount} ${r.original_currency})`,
             isValid: true,
             isDraft: false,
           });
+          if (taxAmt) {
+            activities.push(cashAct(portfolioAccountId, "TAX", dt, Math.abs(taxAmt), `Withholding tax on dividend ${r.name}`));
+          }
         } else {
           activities.push({
             accountId: portfolioAccountId,
@@ -345,11 +345,13 @@ export function transform(rows: TrRow[], config: AddonSettings): TransformResult
             quantity: sharesVal,
             currency: r.currency || "EUR",
             amount: fmtAmt(absAmt),
-            tax: taxAmt ? fmtAmt(Math.abs(taxAmt)) : undefined,
             comment: `Dividend ${r.name}`,
             isValid: true,
             isDraft: false,
           });
+          if (taxAmt) {
+            activities.push(cashAct(portfolioAccountId, "TAX", dt, Math.abs(taxAmt), `Withholding tax on dividend ${r.name}`));
+          }
         }
 
         activities.push(
@@ -363,10 +365,10 @@ export function transform(rows: TrRow[], config: AddonSettings): TransformResult
 
       if (typ === "INTEREST_PAYMENT" || typ === "MANUAL_CASH_TRANSFER") {
         const taxAmt = num(tax);
-        activities.push({
-          ...cashAct(cashAccountId, "INTEREST", dt, absAmt, desc),
-          tax: taxAmt ? fmtAmt(Math.abs(taxAmt)) : undefined,
-        });
+        activities.push(cashAct(cashAccountId, "INTEREST", dt, absAmt, desc));
+        if (taxAmt) {
+          activities.push(cashAct(cashAccountId, "TAX", dt, Math.abs(taxAmt), `Withholding tax on interest`));
+        }
         continue;
       }
 

@@ -249,12 +249,15 @@ describe("DIVIDEND", () => {
       CONFIG,
     );
 
-    expect(activities).toHaveLength(3);
+    expect(activities).toHaveLength(4);
 
     const div = activities.find((a) => a.activityType === "DIVIDEND")!;
     expect(div.accountId).toBe("portfolio");
-    expect(div.tax).toBe("1");
     expect(div.comment).toBe("Dividend Apple");
+
+    const taxAct = activities.find((a) => a.activityType === "TAX")!;
+    expect(taxAct.accountId).toBe("portfolio");
+    expect(taxAct.amount).toBe("1");
 
     const out = activities.find((a) => a.activityType === "TRANSFER_OUT")!;
     expect(out.accountId).toBe("portfolio");
@@ -297,9 +300,10 @@ describe("INTEREST", () => {
       [row({ category: "CASH", type: "INTEREST_PAYMENT", amount: "5", tax: "-0.5" })],
       CONFIG,
     );
-    expect(activities).toHaveLength(1);
+    expect(activities).toHaveLength(2);
     expect(activities[0].activityType).toBe("INTEREST");
-    expect(activities[0].tax).toBe("0.5");
+    const taxAct = activities.find((a) => a.activityType === "TAX")!;
+    expect(taxAct.amount).toBe("0.5");
   });
 });
 
@@ -417,7 +421,7 @@ describe("CSV fixture integration", () => {
   });
 
   it("produces 17 activities and 1 skipped (MIGRATION)", () => {
-    expect(activities).toHaveLength(17);
+    expect(activities).toHaveLength(18);
     expect(skipped).toHaveLength(1);
     expect(skipped[0].type).toBe("MIGRATION");
   });

@@ -4,7 +4,6 @@ import type {
   ActivityImport,
   AddonContext,
   ImportActivitiesResult,
-  NewAsset,
 } from "@wealthfolio/addon-sdk";
 import {
   Button,
@@ -385,34 +384,7 @@ export function ImportPage({ ctx }: { ctx: AddonContext }) {
     // Simulate progress while the single import call runs
     const tick = setInterval(() => setImportProgress((p) => Math.min(p + 5, 90)), 200);
     try {
-      // Create new assets for securities that aren't already in the database.
-      // Activities with an existing assetId were resolved during checkImport; skip those.
-      const createdAssetIdsBySymbol: Record<string, string> = {};
-      const seenSymbols = new Set<string>();
-      for (const a of candidates) {
-        if (a.assetId || !a.symbol || a.symbol === "$CASH-EUR") continue;
-        if (seenSymbols.has(a.symbol)) continue;
-        seenSymbols.add(a.symbol);
-        const payload: NewAsset = {
-          kind: "INVESTMENT",
-          name: a.symbolName || a.symbol,
-          displayCode: a.symbol,
-          isActive: true,
-          quoteMode: "MARKET",
-          quoteCcy: a.quoteCcy || "EUR",
-          instrumentType: a.instrumentType === "FUND" ? "EQUITY" : a.instrumentType,
-          instrumentExchangeMic: a.exchangeMic,
-          providerId: a.providerId,
-          providerSymbol: a.providerSymbol,
-        };
-        const created = await ctx.api.assets.create(payload);
-        createdAssetIdsBySymbol[a.symbol] = created.id;
-      }
-
-      const toImport = candidates.map((a) => {
-        if (a.assetId || !a.symbol || !(a.symbol in createdAssetIdsBySymbol)) return a;
-        return { ...a, assetId: createdAssetIdsBySymbol[a.symbol] };
-      });
+      const toImport = candidates;
 
       const result = await ctx.api.activities.import(toImport);
       clearInterval(tick);

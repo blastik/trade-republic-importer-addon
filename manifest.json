@@ -1,0 +1,42 @@
+{
+  "id": "trade-republic-importer",
+  "name": "Trade Republic Importer",
+  "version": "1.0.0",
+  "description": "Import Trade Republic CSV exports into Wealthfolio. Splits cash and portfolio activities across two accounts and handles internal fund transfers automatically.",
+  "author": "blastik",
+  "main": "addon.js",
+  "sdkVersion": "3.5.1",
+  "enabled": true,
+  "permissions": [
+    {
+      "category": "accounts",
+      "functions": [{ "name": "getAll", "isDeclared": true, "isDetected": false }],
+      "purpose": "List accounts so the user can select their cash and portfolio accounts"
+    },
+    {
+      "category": "activities",
+      "functions": [{ "name": "saveMany", "isDeclared": true, "isDetected": false }],
+      "purpose": "Create imported activities in bulk"
+    },
+    {
+      "category": "assets",
+      "functions": [{ "name": "create", "isDeclared": true, "isDetected": false }],
+      "purpose": "Create new asset entries for unrecognised securities during import"
+    },
+    {
+      "category": "secrets",
+      "functions": [
+        { "name": "get", "isDeclared": true, "isDetected": false },
+        { "name": "set", "isDeclared": true, "isDetected": false }
+      ],
+      "purpose": "Persist addon configuration (account selection, transfer patterns) across sessions"
+    },
+    {
+      "category": "ui",
+      "functions": [{ "name": "sidebar.addItem", "isDeclared": true, "isDetected": false }],
+      "purpose": "Add importer navigation item to sidebar"
+    }
+  ],
+  "keywords": ["trade-republic", "importer", "csv"],
+  "license": "MIT"
+}

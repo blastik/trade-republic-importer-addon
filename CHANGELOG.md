@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.0.1] - 2026-07-04
+
+### Fixed
+
+- ETFs and funds not appearing in investments after import — all BUY, SELL, and TRANSFER_IN (broker transfer) activities are now imported as committed, not as drafts
+
 ## [1.0.0] - 2026-07-04
 
 ### Added

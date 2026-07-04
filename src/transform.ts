@@ -154,7 +154,7 @@ export function transform(rows: TrRow[], config: AddonSettings): TransformResult
         currency: quoteCcy,
         comment: desc ? `${r.name} - ${desc}` : r.name,
         isValid: true,
-        isDraft: true,
+        isDraft: false,
       });
       continue;
     }
@@ -182,7 +182,7 @@ export function transform(rows: TrRow[], config: AddonSettings): TransformResult
         currency: quoteCcy,
         comment: desc ? `${r.name} - ${desc}` : r.name,
         isValid: true,
-        isDraft: true,
+        isDraft: false,
       });
       activities.push(
         cashAct(
@@ -234,7 +234,7 @@ export function transform(rows: TrRow[], config: AddonSettings): TransformResult
         currency: quoteCcy,
         comment: `${r.name} transfer from another broker`,
         isValid: true,
-        isDraft: true,
+        isDraft: false,
       });
       continue;
     }

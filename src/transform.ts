@@ -30,6 +30,15 @@ function matchPattern(
   );
 }
 
+// Appends the time component of a TR datetime to make activity comments unique
+// per transaction. Wealthfolio's idempotencyKey does not include the date field,
+// so same-merchant / same-amount charges (e.g. multiple parking swipes or ETF
+// plan buys on the same day) would otherwise collapse to a single activity.
+function timeTag(dt: string): string {
+  const t = dt.slice(11, 26); // "HH:MM:SS.mmmmmm" from "YYYY-MM-DDTHH:MM:SS.mmmmmmZ"
+  return t ? ` [${t}]` : "";
+}
+
 function cashAct(
   accountId: string,
   activityType: string,
@@ -98,7 +107,7 @@ export function transform(rows: TrRow[], config: AddonSettings): TransformResult
             "CREDIT",
             addSec(dt, -1),
             totalCash,
-            `Stockperk TR gift: ${r.name} (${r.symbol})`,
+            `Stockperk TR gift: ${r.name} (${r.symbol})${timeTag(dt)}`,
             "BONUS",
           ),
         );
@@ -114,7 +123,7 @@ export function transform(rows: TrRow[], config: AddonSettings): TransformResult
           unitPrice: r.price,
           fee: buyFeeTotal ? fmtAmt(buyFeeTotal) : "0",
           currency: quoteCcy,
-          comment: `${r.name} - Stockperk gift buy (funded by TR, not own funds)`,
+          comment: `${r.name} - Stockperk gift buy (funded by TR, not own funds)${timeTag(dt)}`,
           isValid: true,
           isDraft: false,
         });
@@ -128,7 +137,7 @@ export function transform(rows: TrRow[], config: AddonSettings): TransformResult
           "TRANSFER_OUT",
           addSec(dt, -2),
           totalCash,
-          `Funds for ${r.symbol} (${r.name}) buy -> Portfolio`,
+          `Funds for ${r.symbol} (${r.name}) buy -> Portfolio${timeTag(dt)}`,
         ),
       );
       activities.push(
@@ -137,7 +146,7 @@ export function transform(rows: TrRow[], config: AddonSettings): TransformResult
           "TRANSFER_IN",
           addSec(dt, -1),
           totalCash,
-          `Funds from Cash for ${r.symbol} buy`,
+          `Funds from Cash for ${r.symbol} buy${timeTag(dt)}`,
         ),
       );
       activities.push({
@@ -152,7 +161,7 @@ export function transform(rows: TrRow[], config: AddonSettings): TransformResult
         unitPrice: r.price,
         fee: buyFeeTotal ? fmtAmt(buyFeeTotal) : "0",
         currency: quoteCcy,
-        comment: desc ? `${r.name} - ${desc}` : r.name,
+        comment: (desc ? `${r.name} - ${desc}` : r.name) + timeTag(dt),
         isValid: true,
         isDraft: false,
       });
@@ -180,7 +189,7 @@ export function transform(rows: TrRow[], config: AddonSettings): TransformResult
         unitPrice: r.price,
         fee: sellFeeTotal ? fmtAmt(sellFeeTotal) : "0",
         currency: quoteCcy,
-        comment: desc ? `${r.name} - ${desc}` : r.name,
+        comment: (desc ? `${r.name} - ${desc}` : r.name) + timeTag(dt),
         isValid: true,
         isDraft: false,
       });
@@ -190,7 +199,7 @@ export function transform(rows: TrRow[], config: AddonSettings): TransformResult
           "TRANSFER_OUT",
           addSec(dt, 1),
           proceeds,
-          `${r.symbol} (${r.name}) sale -> Cash`,
+          `${r.symbol} (${r.name}) sale -> Cash${timeTag(dt)}`,
         ),
       );
       activities.push(
@@ -199,7 +208,7 @@ export function transform(rows: TrRow[], config: AddonSettings): TransformResult
           "TRANSFER_IN",
           addSec(dt, 2),
           proceeds,
-          `${r.symbol} sale from Portfolio`,
+          `${r.symbol} sale from Portfolio${timeTag(dt)}`,
         ),
       );
       continue;
@@ -232,7 +241,7 @@ export function transform(rows: TrRow[], config: AddonSettings): TransformResult
         quantity: r.shares,
         unitPrice: r.price || undefined,
         currency: quoteCcy,
-        comment: `${r.name} transfer from another broker`,
+        comment: `${r.name} transfer from another broker${timeTag(dt)}`,
         isValid: true,
         isDraft: false,
       });
@@ -250,14 +259,14 @@ export function transform(rows: TrRow[], config: AddonSettings): TransformResult
 
       if (typ === "CUSTOMER_INBOUND" || typ === "CUSTOMER_INPAYMENT") {
         activities.push(
-          cashAct(cashAccountId, "DEPOSIT", dt, absAmt, cpname ? `${desc} (${cpname})` : desc),
+          cashAct(cashAccountId, "DEPOSIT", dt, absAmt, (cpname ? `${desc} (${cpname})` : desc) + timeTag(dt)),
         );
         continue;
       }
 
       if (typ === "CUSTOMER_OUTBOUND_REQUEST") {
         activities.push(
-          cashAct(cashAccountId, "WITHDRAWAL", dt, absAmt, cpname ? `${desc} (${cpname})` : desc),
+          cashAct(cashAccountId, "WITHDRAWAL", dt, absAmt, (cpname ? `${desc} (${cpname})` : desc) + timeTag(dt)),
         );
         continue;
       }
@@ -268,7 +277,7 @@ export function transform(rows: TrRow[], config: AddonSettings): TransformResult
         const mccPart = r.mcc_code ? ` (MCC ${r.mcc_code})` : "";
         const feePart = cardFee ? ` [+ fee ${Math.abs(cardFee).toFixed(2)}]` : "";
         const merchant = r.name || desc;
-        const c = `${merchant}${mccPart}${feePart}`;
+        const c = `${merchant}${mccPart}${feePart}${timeTag(dt)}`;
         activities.push(
           cashAct(
             cashAccountId,
@@ -283,7 +292,7 @@ export function transform(rows: TrRow[], config: AddonSettings): TransformResult
 
       if (typ === "CARD_ORDERING_FEE") {
         const feeAmt = fee ? Math.abs(num(fee)) : absAmt;
-        activities.push(cashAct(cashAccountId, "FEE", dt, feeAmt, desc));
+        activities.push(cashAct(cashAccountId, "FEE", dt, feeAmt, desc + timeTag(dt)));
         continue;
       }
 
@@ -297,7 +306,8 @@ export function transform(rows: TrRow[], config: AddonSettings): TransformResult
             dt,
             net,
             `Saveback - ${r.name}` +
-              (taxAmt ? ` (withholding tax ${Math.abs(taxAmt).toFixed(2)} EUR)` : ""),
+              (taxAmt ? ` (withholding tax ${Math.abs(taxAmt).toFixed(2)} EUR)` : "") +
+              timeTag(dt),
             "BONUS",
           ),
         );
@@ -327,12 +337,12 @@ export function transform(rows: TrRow[], config: AddonSettings): TransformResult
             currency: r.original_currency,
             amount: r.original_amount,
             fxRate: String(wfFx),
-            comment: `Dividend ${r.name} (${r.original_amount} ${r.original_currency})`,
+            comment: `Dividend ${r.name} (${r.original_amount} ${r.original_currency})${timeTag(dt)}`,
             isValid: true,
             isDraft: false,
           });
           if (taxAmt) {
-            activities.push(cashAct(portfolioAccountId, "TAX", dt, Math.abs(taxAmt), `Withholding tax on dividend ${r.name}`));
+            activities.push(cashAct(portfolioAccountId, "TAX", dt, Math.abs(taxAmt), `Withholding tax on dividend ${r.name}${timeTag(dt)}`));
           }
         } else {
           activities.push({
@@ -345,29 +355,29 @@ export function transform(rows: TrRow[], config: AddonSettings): TransformResult
             quantity: sharesVal,
             currency: r.currency || "EUR",
             amount: fmtAmt(absAmt),
-            comment: `Dividend ${r.name}`,
+            comment: `Dividend ${r.name}${timeTag(dt)}`,
             isValid: true,
             isDraft: false,
           });
           if (taxAmt) {
-            activities.push(cashAct(portfolioAccountId, "TAX", dt, Math.abs(taxAmt), `Withholding tax on dividend ${r.name}`));
+            activities.push(cashAct(portfolioAccountId, "TAX", dt, Math.abs(taxAmt), `Withholding tax on dividend ${r.name}${timeTag(dt)}`));
           }
         }
 
         activities.push(
-          cashAct(portfolioAccountId, "TRANSFER_OUT", tOut, netEur, `Dividend ${r.name} -> Cash`),
+          cashAct(portfolioAccountId, "TRANSFER_OUT", tOut, netEur, `Dividend ${r.name} -> Cash${timeTag(dt)}`),
         );
         activities.push(
-          cashAct(cashAccountId, "TRANSFER_IN", tIn, netEur, `Dividend ${r.name} from Portfolio`),
+          cashAct(cashAccountId, "TRANSFER_IN", tIn, netEur, `Dividend ${r.name} from Portfolio${timeTag(dt)}`),
         );
         continue;
       }
 
       if (typ === "INTEREST_PAYMENT" || typ === "MANUAL_CASH_TRANSFER") {
         const taxAmt = num(tax);
-        activities.push(cashAct(cashAccountId, "INTEREST", dt, absAmt, desc));
+        activities.push(cashAct(cashAccountId, "INTEREST", dt, absAmt, desc + timeTag(dt)));
         if (taxAmt) {
-          activities.push(cashAct(cashAccountId, "TAX", dt, Math.abs(taxAmt), `Withholding tax on interest`));
+          activities.push(cashAct(cashAccountId, "TAX", dt, Math.abs(taxAmt), `Withholding tax on interest${timeTag(dt)}`));
         }
         continue;
       }
@@ -376,15 +386,15 @@ export function transform(rows: TrRow[], config: AddonSettings): TransformResult
         const match = matchPattern(cpiban, desc, transferPatterns);
         if (match) {
           activities.push(
-            cashAct(cashAccountId, "TRANSFER_OUT", dt, absAmt, `-> ${match.label}: ${desc}`),
+            cashAct(cashAccountId, "TRANSFER_OUT", dt, absAmt, `-> ${match.label}: ${desc}${timeTag(dt)}`),
           );
           if (match.destinationAccountId) {
             activities.push(
-              cashAct(match.destinationAccountId, "TRANSFER_IN", dt, absAmt, `<- TR: ${desc}`),
+              cashAct(match.destinationAccountId, "TRANSFER_IN", dt, absAmt, `<- TR: ${desc}${timeTag(dt)}`),
             );
           }
         } else {
-          activities.push(cashAct(cashAccountId, "WITHDRAWAL", dt, absAmt, desc));
+          activities.push(cashAct(cashAccountId, "WITHDRAWAL", dt, absAmt, desc + timeTag(dt)));
         }
         continue;
       }
@@ -396,7 +406,7 @@ export function transform(rows: TrRow[], config: AddonSettings): TransformResult
             amt >= 0 ? "DEPOSIT" : "WITHDRAWAL",
             dt,
             absAmt,
-            cpname ? `${desc} (${cpname})` : desc,
+            (cpname ? `${desc} (${cpname})` : desc) + timeTag(dt),
           ),
         );
         continue;
@@ -412,17 +422,17 @@ export function transform(rows: TrRow[], config: AddonSettings): TransformResult
               "TRANSFER_OUT",
               dt,
               absAmt,
-              `-> ${match.label}: ${desc}` + (cpname ? ` (${cpname})` : ""),
+              `-> ${match.label}: ${desc}` + (cpname ? ` (${cpname})` : "") + timeTag(dt),
             ),
           );
           if (match.destinationAccountId) {
             activities.push(
-              cashAct(match.destinationAccountId, "TRANSFER_IN", dt, absAmt, `<- TR: ${desc}`),
+              cashAct(match.destinationAccountId, "TRANSFER_IN", dt, absAmt, `<- TR: ${desc}${timeTag(dt)}`),
             );
           }
         } else {
           activities.push(
-            cashAct(cashAccountId, "WITHDRAWAL", dt, absAmt, cpname ? `${desc} (${cpname})` : desc),
+            cashAct(cashAccountId, "WITHDRAWAL", dt, absAmt, (cpname ? `${desc} (${cpname})` : desc) + timeTag(dt)),
           );
         }
         continue;

@@ -59,7 +59,7 @@ of your choice.
 
 ## Notes
 
-- Currency is driven by the CSV; the cash symbol `$CASH-EUR` is used for EUR
-  cash entries.
+- Currency is driven by the CSV. Cash activities use the corresponding currency
+  symbol (e.g. `$CASH-EUR` for EUR, `$CASH-USD` for USD, etc.).
 - Settings (account selection, transfer patterns) are stored securely in
   Wealthfolio's secrets store and pre-filled on every import.

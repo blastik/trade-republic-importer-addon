@@ -11,7 +11,7 @@ accounts you select in Settings.
 
 ## Setup
 
-1. Install the addon ZIP in Wealthfolio (Addons → Install from file)
+1. Install the addon in Wealthfolio from the community registry (or manually install from a GitHub release)
 2. Go to **Trade Republic → Settings**
 3. Select your **Cash account** and **Portfolio account**
 4. Optionally add **Transfer Patterns** to categorise recurring bank transfers

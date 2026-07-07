@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.1.0] - 2026-07-07
+
+### Added
+
+- Settings: account dropdowns now filter by type — cash selector shows only CASH accounts, securities selector shows only SECURITIES accounts
+- Settings: account names in dropdowns now display their currency for easier identification
+- Multi-currency support: cash account currency is captured from the selected account and used throughout the transform (symbol `$CASH-{CURRENCY}`, activity `currency` field) — no longer hardcoded to EUR
+
 ## [1.0.0] - 2026-07-07
 
 ### Added

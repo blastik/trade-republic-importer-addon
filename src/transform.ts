@@ -39,32 +39,36 @@ function timeTag(dt: string): string {
   return t ? ` [${t}]` : "";
 }
 
-function cashAct(
-  accountId: string,
-  activityType: string,
-  date: string,
-  amount: number,
-  comment: string,
-  subtype?: string,
-): ActivityImport {
-  return {
-    accountId,
-    activityType: activityType as ActivityImport["activityType"],
-    subtype: subtype ?? undefined,
-    date,
-    symbol: "$CASH-EUR",
-    quantity: "1",
-    unitPrice: "1",
-    amount: fmtAmt(amount),
-    currency: "EUR",
-    comment,
-    isValid: true,
-    isDraft: false,
+function makeCashAct(currency: string) {
+  return function cashAct(
+    accountId: string,
+    activityType: string,
+    date: string,
+    amount: number,
+    comment: string,
+    subtype?: string,
+  ): ActivityImport {
+    return {
+      accountId,
+      activityType: activityType as ActivityImport["activityType"],
+      subtype: subtype ?? undefined,
+      date,
+      symbol: `$CASH-${currency}`,
+      quantity: "1",
+      unitPrice: "1",
+      amount: fmtAmt(amount),
+      currency,
+      comment,
+      isValid: true,
+      isDraft: false,
+    };
   };
 }
 
 export function transform(rows: TrRow[], config: AddonSettings): TransformResult {
   const { cashAccountId, portfolioAccountId, transferPatterns } = config;
+  const cashCurrency = config.cashCurrency || "EUR";
+  const cashAct = makeCashAct(cashCurrency);
 
   const activities: ActivityImport[] = [];
   const skipped: SkippedRow[] = [];
@@ -316,9 +320,9 @@ export function transform(rows: TrRow[], config: AddonSettings): TransformResult
 
       if (typ === "DIVIDEND") {
         const taxAmt = num(tax);
-        const netEur = absAmt + taxAmt;
+        const netCash = absAmt + taxAmt;
         const sharesVal = r.shares || "1";
-        const quoteCcy = r.original_currency || r.currency || "EUR";
+        const quoteCcy = r.original_currency || r.currency || cashCurrency;
 
         const tOut = addSec(dt, 1);
         const tIn = addSec(dt, 2);
@@ -353,7 +357,7 @@ export function transform(rows: TrRow[], config: AddonSettings): TransformResult
             symbolName: r.name,
             quoteCcy,
             quantity: sharesVal,
-            currency: r.currency || "EUR",
+            currency: r.currency || cashCurrency,
             amount: fmtAmt(absAmt),
             comment: `Dividend ${r.name}${timeTag(dt)}`,
             isValid: true,
@@ -365,10 +369,10 @@ export function transform(rows: TrRow[], config: AddonSettings): TransformResult
         }
 
         activities.push(
-          cashAct(portfolioAccountId, "TRANSFER_OUT", tOut, netEur, `Dividend ${r.name} -> Cash${timeTag(dt)}`),
+          cashAct(portfolioAccountId, "TRANSFER_OUT", tOut, netCash, `Dividend ${r.name} -> Cash${timeTag(dt)}`),
         );
         activities.push(
-          cashAct(cashAccountId, "TRANSFER_IN", tIn, netEur, `Dividend ${r.name} from Portfolio${timeTag(dt)}`),
+          cashAct(cashAccountId, "TRANSFER_IN", tIn, netCash, `Dividend ${r.name} from Portfolio${timeTag(dt)}`),
         );
         continue;
       }

@@ -24,21 +24,24 @@ function AccountSelect({
   value,
   onChange,
   placeholder,
+  filterType,
 }: {
   accounts: Account[];
   value: string;
   onChange: (v: string) => void;
   placeholder: string;
+  filterType?: Account["accountType"];
 }) {
+  const filtered = filterType ? accounts.filter((a) => a.accountType === filterType) : accounts;
   return (
     <Select value={value} onValueChange={onChange}>
       <SelectTrigger className="w-full">
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
       <SelectContent>
-        {accounts.map((a) => (
+        {filtered.map((a) => (
           <SelectItem key={a.id} value={a.id}>
-            {a.name}
+            {a.name} <span className="text-muted-foreground">({a.currency})</span>
           </SelectItem>
         ))}
       </SelectContent>
@@ -137,8 +140,12 @@ export function SettingsPage({ ctx }: { ctx: AddonContext }) {
             <AccountSelect
               accounts={accounts}
               value={settings.cashAccountId}
-              onChange={(v) => set({ cashAccountId: v })}
+              onChange={(v) => {
+                const acc = accounts.find((a) => a.id === v);
+                set({ cashAccountId: v, cashCurrency: acc?.currency ?? "EUR" });
+              }}
               placeholder="Select cash account…"
+              filterType="CASH"
             />
             <p className="text-muted-foreground text-xs">
               Receives deposits, withdrawals, card transactions, interest, and saveback rewards.
@@ -151,6 +158,7 @@ export function SettingsPage({ ctx }: { ctx: AddonContext }) {
               value={settings.portfolioAccountId}
               onChange={(v) => set({ portfolioAccountId: v })}
               placeholder="Select securities account…"
+              filterType="SECURITIES"
             />
             <p className="text-muted-foreground text-xs">
               Receives buy/sell trades and dividends. The importer automatically creates internal

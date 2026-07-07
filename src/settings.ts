@@ -5,6 +5,7 @@ const SECRETS_KEY = "config";
 
 export const DEFAULT_SETTINGS: AddonSettings = {
   cashAccountId: "",
+  cashCurrency: "EUR",
   portfolioAccountId: "",
   transferPatterns: [],
 };

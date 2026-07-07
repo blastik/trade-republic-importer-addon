@@ -35,6 +35,7 @@ export interface TransferPattern {
 
 export interface AddonSettings {
   cashAccountId: string;
+  cashCurrency: string;
   portfolioAccountId: string;
   transferPatterns: TransferPattern[];
 }

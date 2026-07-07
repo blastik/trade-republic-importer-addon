@@ -10,6 +10,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const CONFIG: AddonSettings = {
   cashAccountId: "cash",
+  cashCurrency: "EUR",
   portfolioAccountId: "portfolio",
   transferPatterns: [],
 };

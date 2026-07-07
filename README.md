@@ -11,7 +11,7 @@ accounts you select in Settings.
 
 ## Setup
 
-1. Install the addon ZIP in Wealthfolio (Addons → Install from file)
+1. Install the addon in Wealthfolio from the community registry (or manually install from a GitHub release)
 2. Go to **Trade Republic → Settings**
 3. Select your **Cash account** and **Portfolio account**
 4. Optionally add **Transfer Patterns** to categorise recurring bank transfers
@@ -59,7 +59,7 @@ of your choice.
 
 ## Notes
 
-- Currency is driven by the CSV; the cash symbol `$CASH-EUR` is used for EUR
-  cash entries.
+- Currency is driven by the CSV. Cash activities use the corresponding currency
+  symbol (e.g. `$CASH-EUR` for EUR, `$CASH-USD` for USD, etc.).
 - Settings (account selection, transfer patterns) are stored securely in
   Wealthfolio's secrets store and pre-filled on every import.

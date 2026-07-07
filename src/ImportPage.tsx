@@ -1,7 +1,9 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import type {
   Account,
+  ActivityCreate,
   ActivityImport,
+  ActivityUpdate,
   AddonContext,
   ImportActivitiesResult,
 } from "@wealthfolio/addon-sdk";
@@ -180,11 +182,11 @@ function ActivityRow({
               onClick={onToggleInclude}
               className={`rounded px-1.5 py-0.5 text-[10px] font-medium transition-colors ${
                 included
-                  ? "bg-muted text-muted-foreground hover:bg-muted/80"
-                  : "bg-primary text-primary-foreground"
+                  ? "text-muted-foreground hover:text-foreground"
+                  : "bg-primary text-primary-foreground hover:bg-primary/90"
               }`}
             >
-              {included ? "Remove" : "Include"}
+              {included ? "Skip" : "Include"}
             </button>
           </div>
         )}
@@ -212,7 +214,7 @@ export function ImportPage({ ctx }: { ctx: AddonContext }) {
   const [securities, setSecurities] = useState<SecurityInfo[]>([]);
   const [mappings, setMappings] = useState<Map<string, SecurityMapping>>(new Map());
   const [checked, setChecked] = useState<ActivityImport[] | null>(null);
-  const [forceIncludeLines, setForceIncludeLines] = useState<Set<number>>(new Set());
+  const [excludedLines, setExcludedLines] = useState<Set<number>>(new Set());
   const [showDuplicatesOnly, setShowDuplicatesOnly] = useState(false);
 
   const [fileError, setFileError] = useState("");
@@ -305,7 +307,7 @@ export function ImportPage({ ctx }: { ctx: AddonContext }) {
       setFileName(file.name);
       setMappings(new Map());
       setChecked(null);
-      setForceIncludeLines(new Set());
+      setExcludedLines(new Set());
       setShowDuplicatesOnly(false);
       setCheckError("");
 
@@ -333,8 +335,8 @@ export function ImportPage({ ctx }: { ctx: AddonContext }) {
     [settings, runCheckImport],
   );
 
-  const toggleInclude = useCallback((lineNumber: number) => {
-    setForceIncludeLines((prev) => {
+  const toggleExclude = useCallback((lineNumber: number) => {
+    setExcludedLines((prev) => {
       const next = new Set(prev);
       if (next.has(lineNumber)) next.delete(lineNumber);
       else next.add(lineNumber);
@@ -347,13 +349,13 @@ export function ImportPage({ ctx }: { ctx: AddonContext }) {
       const lines = duplicates
         .filter((a) => a.lineNumber != null)
         .map((a) => a.lineNumber as number);
-      const allIncluded = lines.every((ln) => forceIncludeLines.has(ln));
-      setForceIncludeLines(() => {
-        if (allIncluded) return new Set<number>();
+      const allExcluded = lines.every((ln) => excludedLines.has(ln));
+      setExcludedLines(() => {
+        if (allExcluded) return new Set<number>();
         return new Set(lines);
       });
     },
-    [forceIncludeLines],
+    [excludedLines],
   );
 
   // ── Import ────────────────────────────────────────────────────────────────
@@ -361,35 +363,97 @@ export function ImportPage({ ctx }: { ctx: AddonContext }) {
   const handleImport = useCallback(async () => {
     if (!checked) return;
 
-    // DB duplicates are skipped unless the user explicitly included them.
-    // Activities flagged only as duplicateOfLineNumber (within-batch false positives)
-    // are treated as valid and imported with forceImport:true so the host accepts them.
-    const candidates = checked
-      .filter((a) => {
-        if (activityStatus(a) === "error") return false;
-        if (activityStatus(a) === "duplicate") {
-          return a.lineNumber != null && forceIncludeLines.has(a.lineNumber);
-        }
-        return true;
-      })
-      .map((a) => ({
-        ...a,
-        forceImport:
-          activityStatus(a) === "duplicate" || typeof a.duplicateOfLineNumber === "number",
-      }));
+    const dups = checked.filter((a) => activityStatus(a) === "duplicate");
+    const userSkippedCount = dups.filter(
+      (a) => a.lineNumber != null && excludedLines.has(a.lineNumber),
+    ).length;
+
+    const candidates = checked.filter((a) => {
+      if (activityStatus(a) === "error") return false;
+      // Duplicates are included by default; only skip if user explicitly excluded them.
+      if (a.lineNumber != null && excludedLines.has(a.lineNumber)) return false;
+      return true;
+    });
 
     setImportProgress(0);
     setStep("importing");
 
-    // Simulate progress while the single import call runs
-    const tick = setInterval(() => setImportProgress((p) => Math.min(p + 5, 90)), 200);
+    let importedCount = 0;
+    let skippedCount = 0;
     try {
-      const toImport = candidates;
+      for (let i = 0; i < candidates.length; i++) {
+        const a = candidates[i];
+        const assetInput =
+          a.symbol || a.assetId
+            ? {
+                id: a.assetId,
+                symbol: a.symbol,
+                name: a.symbolName,
+                exchangeMic: a.exchangeMic,
+                quoteCcy: a.quoteCcy,
+                instrumentType: a.instrumentType,
+                providerId: a.providerId,
+                providerSymbol: a.providerSymbol,
+              }
+            : undefined;
 
-      const result = await ctx.api.activities.import(toImport);
-      clearInterval(tick);
+        try {
+          if (activityStatus(a) === "duplicate" && a.duplicateOfId) {
+            // Activity already exists — update it so re-imports succeed without duplicating.
+            const upd: ActivityUpdate = {
+              id: a.duplicateOfId,
+              accountId: a.accountId,
+              activityType: a.activityType,
+              subtype: a.subtype,
+              activityDate: a.date as string,
+              currency: a.currency,
+              quantity: a.quantity,
+              unitPrice: a.unitPrice,
+              amount: a.amount,
+              fee: a.fee,
+              fxRate: a.fxRate,
+              comment: a.comment,
+              asset: assetInput,
+            };
+            await ctx.api.activities.update(upd);
+          } else {
+            const cre: ActivityCreate = {
+              accountId: a.accountId,
+              activityType: a.activityType,
+              subtype: a.subtype,
+              activityDate: a.date as string,
+              currency: a.currency,
+              quantity: a.quantity,
+              unitPrice: a.unitPrice,
+              amount: a.amount,
+              fee: a.fee,
+              fxRate: a.fxRate,
+              comment: a.comment,
+              asset: assetInput,
+            };
+            await ctx.api.activities.create(cre);
+          }
+          importedCount++;
+        } catch {
+          skippedCount++;
+        }
+        setImportProgress(Math.round(((i + 1) / candidates.length) * 95) + 2);
+      }
       setImportProgress(100);
-      setImportResult(result);
+
+      const syntheticResult: ImportActivitiesResult = {
+        activities: candidates,
+        importRunId: "",
+        summary: {
+          total: candidates.length + userSkippedCount,
+          imported: importedCount,
+          skipped: skippedCount,
+          duplicates: userSkippedCount,
+          assetsCreated: 0,
+          success: skippedCount === 0,
+        },
+      };
+      setImportResult(syntheticResult);
       setStep("done");
 
       try {
@@ -399,11 +463,10 @@ export function ImportPage({ ctx }: { ctx: AddonContext }) {
         // non-critical
       }
     } catch (e) {
-      clearInterval(tick);
       setCheckError(String(e));
       setStep("confirm");
     }
-  }, [checked, forceIncludeLines, ctx]);
+  }, [checked, excludedLines, ctx]);
 
   // ── Reset ─────────────────────────────────────────────────────────────────
 
@@ -414,7 +477,7 @@ export function ImportPage({ ctx }: { ctx: AddonContext }) {
     setSecurities([]);
     setMappings(new Map());
     setChecked(null);
-    setForceIncludeLines(new Set());
+    setExcludedLines(new Set());
     setShowDuplicatesOnly(false);
     setFileError("");
     setCheckError("");
@@ -533,10 +596,10 @@ export function ImportPage({ ctx }: { ctx: AddonContext }) {
     const valid = checked.filter((a) => activityStatus(a) === "valid");
     const duplicates = checked.filter((a) => activityStatus(a) === "duplicate");
     const errors = checked.filter((a) => activityStatus(a) === "error");
-    const userForcedDuplicates = duplicates.filter(
-      (a) => a.lineNumber != null && forceIncludeLines.has(a.lineNumber),
-    );
-    const toImportCount = valid.length + userForcedDuplicates.length;
+    const userExcludedCount = duplicates.filter(
+      (a) => a.lineNumber != null && excludedLines.has(a.lineNumber),
+    ).length;
+    const toImportCount = valid.length + duplicates.length - userExcludedCount;
     const unsupported = parseResult?.skipped ?? [];
 
     const visibleActivities = showDuplicatesOnly
@@ -577,16 +640,16 @@ export function ImportPage({ ctx }: { ctx: AddonContext }) {
           <div className="bg-muted flex items-center justify-between rounded-lg px-4 py-3 text-sm">
             <span>
               <span className="font-medium">{duplicates.length} duplicate</span>
-              {duplicates.length !== 1 ? "s" : ""} already exist in Wealthfolio and will be{" "}
-              <strong>skipped</strong>.
+              {duplicates.length !== 1 ? "s" : ""} already exist in Wealthfolio — will be{" "}
+              <strong>updated</strong> unless skipped.
             </span>
             <button
               onClick={() => toggleAllDuplicates(duplicates)}
               className="bg-primary text-primary-foreground hover:bg-primary/90 ml-4 shrink-0 rounded px-2 py-1 text-xs font-medium transition-colors"
             >
-              {duplicates.every((a) => a.lineNumber != null && forceIncludeLines.has(a.lineNumber))
-                ? "Remove all"
-                : "Include all"}
+              {duplicates.every((a) => a.lineNumber != null && excludedLines.has(a.lineNumber))
+                ? "Include all"
+                : "Skip all"}
             </button>
           </div>
         )}
@@ -637,9 +700,9 @@ export function ImportPage({ ctx }: { ctx: AddonContext }) {
                           key={i}
                           activity={a}
                           accountName={accountName}
-                          included={a.lineNumber != null && forceIncludeLines.has(a.lineNumber)}
+                          included={a.lineNumber == null || !excludedLines.has(a.lineNumber)}
                           onToggleInclude={() =>
-                            a.lineNumber != null && toggleInclude(a.lineNumber)
+                            a.lineNumber != null && toggleExclude(a.lineNumber)
                           }
                         />
                       ))}
@@ -711,12 +774,10 @@ export function ImportPage({ ctx }: { ctx: AddonContext }) {
           </Card>
           <Card>
             <CardContent className="p-4 text-center">
-              <p
-                className={`text-2xl font-bold ${(summary.duplicates ?? 0) > 0 ? "text-yellow-600 dark:text-yellow-400" : "text-muted-foreground"}`}
-              >
+              <p className="text-muted-foreground text-2xl font-bold">
                 {summary.duplicates ?? 0}
               </p>
-              <p className="text-muted-foreground mt-0.5 text-xs">Duplicates skipped</p>
+              <p className="text-muted-foreground mt-0.5 text-xs">Manually skipped</p>
             </CardContent>
           </Card>
           <Card>
@@ -733,8 +794,8 @@ export function ImportPage({ ctx }: { ctx: AddonContext }) {
 
         {hasIssues && (
           <p className="text-muted-foreground text-sm">
-            Duplicates were skipped. To re-import them, go back and toggle{" "}
-            <span className="font-medium">Import anyway</span> on the rows you want.
+            {summary.skipped ?? 0} activit{(summary.skipped ?? 0) === 1 ? "y" : "ies"} could not
+            be saved. They may already exist or contain invalid data.
           </p>
         )}
 

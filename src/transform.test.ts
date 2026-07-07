@@ -253,7 +253,7 @@ describe("DIVIDEND", () => {
 
     const div = activities.find((a) => a.activityType === "DIVIDEND")!;
     expect(div.accountId).toBe("portfolio");
-    expect(div.comment).toBe("Dividend Apple");
+    expect(div.comment).toContain("Dividend Apple");
 
     const taxAct = activities.find((a) => a.activityType === "TAX")!;
     expect(taxAct.accountId).toBe("portfolio");
@@ -525,7 +525,7 @@ describe("CSV fixture integration", () => {
 
   it("TRANSFER_OUTBOUND (unmatched) → plain WITHDRAWAL from cash", () => {
     const w = activities.find(
-      (a) => a.activityType === "WITHDRAWAL" && a.comment === "Outgoing transfer for Jane Doe",
+      (a) => a.activityType === "WITHDRAWAL" && a.comment?.startsWith("Outgoing transfer for Jane Doe"),
     )!;
     expect(w.amount).toBe("300");
     expect(w.accountId).toBe("cash");

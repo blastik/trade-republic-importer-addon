@@ -35,7 +35,7 @@ export default function enable(ctx: AddonContext) {
     id: ADDON_ID,
     label: "Trade Republic",
     icon: <TrIcon className="h-5 w-5" />,
-    route: `/addon/${ADDON_ID}/import`,
+    route: `/addon/${ADDON_ID}`,
     order: 100,
   });
 
@@ -52,6 +52,11 @@ export default function enable(ctx: AddonContext) {
       <SettingsPage ctx={ctx} />
     </div>
   );
+
+  ctx.router.add({
+    path: `/addon/${ADDON_ID}`,
+    component: React.lazy(() => Promise.resolve({ default: ImportWrapper })),
+  });
 
   ctx.router.add({
     path: `/addon/${ADDON_ID}/import`,
@@ -77,7 +82,7 @@ function Nav({ ctx }: { ctx: AddonContext }) {
   const base = `/addon/${ADDON_ID}`;
 
   const link = (path: string, label: string) => {
-    const active = current === path;
+    const active = current === path || (path === `${base}/import` && current === base);
     return (
       <button
         onClick={() => ctx.api.navigation.navigate(path)}

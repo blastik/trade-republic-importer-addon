@@ -48,7 +48,13 @@ export interface SkippedRow {
   reason: string;
 }
 
+// ActivityImport (the CSV-import-shaped SDK type) has no sourceGroupId field —
+// only Activity/ActivityCreate/ActivityUpdate do. We carry our own
+// transferGroupId through transform() and translate it to sourceGroupId when
+// building the ActivityCreate/ActivityUpdate payloads in ImportPage.
+export type ActivityImportEx = ActivityImport & { transferGroupId?: string };
+
 export interface TransformResult {
-  activities: ActivityImport[];
+  activities: ActivityImportEx[];
   skipped: SkippedRow[];
 }

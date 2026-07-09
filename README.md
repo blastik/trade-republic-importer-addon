@@ -36,7 +36,7 @@ accounts you select in Settings.
 | DELIVERY / FREE_RECEIPT                                 | BUY at cost zero (gifted shares)                    |
 | DELIVERY / MIGRATION                                    | Skipped (technical ISIN change, no net effect)      |
 | CASH / CUSTOMER_INBOUND, CUSTOMER_INPAYMENT             | DEPOSIT                                             |
-| CASH / CUSTOMER_OUTBOUND_REQUEST                        | WITHDRAWAL                                          |
+| CASH / CUSTOMER_OUTBOUND_REQUEST                        | WITHDRAWAL or TRANSFER (via transfer patterns)      |
 | CASH / CARD_TRANSACTION, CARD_TRANSACTION_INTERNATIONAL | WITHDRAWAL                                          |
 | CASH / CARD_ORDERING_FEE                                | FEE                                                 |
 | CASH / BENEFITS_SAVEBACK                                | DIVIDEND (Saveback cashback)                        |
@@ -63,3 +63,10 @@ of your choice.
   symbol (e.g. `$CASH-EUR` for EUR, `$CASH-USD` for USD, etc.).
 - Settings (account selection, transfer patterns) are stored securely in
   Wealthfolio's secrets store and pre-filled on every import.
+- Internal money movements — BUY funding, SELL/DIVIDEND cash sweeps, and any
+  Transfer Pattern with a destination account selected — are excluded from
+  Wealthfolio's spending totals. Each `TRANSFER_OUT`/`TRANSFER_IN` pair the
+  importer creates is tagged with a shared `sourceGroupId`, which Wealthfolio
+  uses to recognise it as an internal transfer rather than an expense. A
+  Transfer Pattern left without a destination account (i.e. a genuine external
+  transfer) is recorded as a plain `WITHDRAWAL` and correctly counts as spending.

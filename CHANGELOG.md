@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.1] - 2026-07-09
+
+### Fixed
+
+- Internal transfers (BUY funding, SELL/DIVIDEND cash sweeps, and matched Transfer Pattern pairs) no longer inflate Wealthfolio's spending totals. Each `TRANSFER_OUT`/`TRANSFER_IN` pair is now tagged with a shared `sourceGroupId`, which Wealthfolio's spending calculator uses to recognise the pair as an internal transfer rather than an expense.
+- `CUSTOMER_OUTBOUND_REQUEST` (withdrawal requests to your linked bank account) now checks Transfer Patterns like `TRANSFER_OUTBOUND` already did — previously it was unconditionally recorded as a `WITHDRAWAL` even when a matching pattern with a destination account was configured, always counting it as spending.
+
 ## [1.1.0] - 2026-07-07
 
 ### Added

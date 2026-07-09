@@ -1,5 +1,12 @@
 import type { ActivityImport } from "@wealthfolio/addon-sdk";
-import type { AddonSettings, SkippedRow, TransformResult, TransferPattern, TrRow } from "./types";
+import type {
+  ActivityImportEx,
+  AddonSettings,
+  SkippedRow,
+  TransformResult,
+  TransferPattern,
+  TrRow,
+} from "./types";
 
 function addSec(isoDate: string, seconds: number): string {
   return new Date(new Date(isoDate).getTime() + seconds * 1000).toISOString();
@@ -47,7 +54,8 @@ function makeCashAct(currency: string) {
     amount: number,
     comment: string,
     subtype?: string,
-  ): ActivityImport {
+    transferGroupId?: string,
+  ): ActivityImportEx {
     return {
       accountId,
       activityType: activityType as ActivityImport["activityType"],
@@ -61,6 +69,7 @@ function makeCashAct(currency: string) {
       comment,
       isValid: true,
       isDraft: false,
+      transferGroupId,
     };
   };
 }
@@ -70,7 +79,7 @@ export function transform(rows: TrRow[], config: AddonSettings): TransformResult
   const cashCurrency = config.cashCurrency || "EUR";
   const cashAct = makeCashAct(cashCurrency);
 
-  const activities: ActivityImport[] = [];
+  const activities: ActivityImportEx[] = [];
   const skipped: SkippedRow[] = [];
 
   // Pre-build set of BUY transaction_ids funded by a STOCKPERK gift
@@ -135,6 +144,7 @@ export function transform(rows: TrRow[], config: AddonSettings): TransformResult
       }
 
       // Regular BUY: fund from Efectivo via internal transfer
+      const buyGroupId = `buy-${r.transaction_id}`;
       activities.push(
         cashAct(
           cashAccountId,
@@ -142,6 +152,8 @@ export function transform(rows: TrRow[], config: AddonSettings): TransformResult
           addSec(dt, -2),
           totalCash,
           `Funds for ${r.symbol} (${r.name}) buy -> Portfolio${timeTag(dt)}`,
+          undefined,
+          buyGroupId,
         ),
       );
       activities.push(
@@ -151,6 +163,8 @@ export function transform(rows: TrRow[], config: AddonSettings): TransformResult
           addSec(dt, -1),
           totalCash,
           `Funds from Cash for ${r.symbol} buy${timeTag(dt)}`,
+          undefined,
+          buyGroupId,
         ),
       );
       activities.push({
@@ -197,6 +211,7 @@ export function transform(rows: TrRow[], config: AddonSettings): TransformResult
         isValid: true,
         isDraft: false,
       });
+      const sellGroupId = `sell-${r.transaction_id}`;
       activities.push(
         cashAct(
           portfolioAccountId,
@@ -204,6 +219,8 @@ export function transform(rows: TrRow[], config: AddonSettings): TransformResult
           addSec(dt, 1),
           proceeds,
           `${r.symbol} (${r.name}) sale -> Cash${timeTag(dt)}`,
+          undefined,
+          sellGroupId,
         ),
       );
       activities.push(
@@ -213,6 +230,8 @@ export function transform(rows: TrRow[], config: AddonSettings): TransformResult
           addSec(dt, 2),
           proceeds,
           `${r.symbol} sale from Portfolio${timeTag(dt)}`,
+          undefined,
+          sellGroupId,
         ),
       );
       continue;
@@ -269,9 +288,39 @@ export function transform(rows: TrRow[], config: AddonSettings): TransformResult
       }
 
       if (typ === "CUSTOMER_OUTBOUND_REQUEST") {
-        activities.push(
-          cashAct(cashAccountId, "WITHDRAWAL", dt, absAmt, (cpname ? `${desc} (${cpname})` : desc) + timeTag(dt)),
-        );
+        const match = matchPattern(cpiban, desc, transferPatterns);
+
+        if (match) {
+          const groupId = match.destinationAccountId ? `xfer-${r.transaction_id}` : undefined;
+          activities.push(
+            cashAct(
+              cashAccountId,
+              "TRANSFER_OUT",
+              dt,
+              absAmt,
+              `-> ${match.label}: ${desc}` + (cpname ? ` (${cpname})` : "") + timeTag(dt),
+              undefined,
+              groupId,
+            ),
+          );
+          if (match.destinationAccountId) {
+            activities.push(
+              cashAct(
+                match.destinationAccountId,
+                "TRANSFER_IN",
+                dt,
+                absAmt,
+                `<- TR: ${desc}${timeTag(dt)}`,
+                undefined,
+                groupId,
+              ),
+            );
+          }
+        } else {
+          activities.push(
+            cashAct(cashAccountId, "WITHDRAWAL", dt, absAmt, (cpname ? `${desc} (${cpname})` : desc) + timeTag(dt)),
+          );
+        }
         continue;
       }
 
@@ -368,11 +417,28 @@ export function transform(rows: TrRow[], config: AddonSettings): TransformResult
           }
         }
 
+        const dividendGroupId = `div-${r.transaction_id}`;
         activities.push(
-          cashAct(portfolioAccountId, "TRANSFER_OUT", tOut, netCash, `Dividend ${r.name} -> Cash${timeTag(dt)}`),
+          cashAct(
+            portfolioAccountId,
+            "TRANSFER_OUT",
+            tOut,
+            netCash,
+            `Dividend ${r.name} -> Cash${timeTag(dt)}`,
+            undefined,
+            dividendGroupId,
+          ),
         );
         activities.push(
-          cashAct(cashAccountId, "TRANSFER_IN", tIn, netCash, `Dividend ${r.name} from Portfolio${timeTag(dt)}`),
+          cashAct(
+            cashAccountId,
+            "TRANSFER_IN",
+            tIn,
+            netCash,
+            `Dividend ${r.name} from Portfolio${timeTag(dt)}`,
+            undefined,
+            dividendGroupId,
+          ),
         );
         continue;
       }
@@ -389,12 +455,29 @@ export function transform(rows: TrRow[], config: AddonSettings): TransformResult
       if (typ === "TRANSFER_DIRECT_DEBIT_INBOUND") {
         const match = matchPattern(cpiban, desc, transferPatterns);
         if (match) {
+          const groupId = match.destinationAccountId ? `xfer-${r.transaction_id}` : undefined;
           activities.push(
-            cashAct(cashAccountId, "TRANSFER_OUT", dt, absAmt, `-> ${match.label}: ${desc}${timeTag(dt)}`),
+            cashAct(
+              cashAccountId,
+              "TRANSFER_OUT",
+              dt,
+              absAmt,
+              `-> ${match.label}: ${desc}${timeTag(dt)}`,
+              undefined,
+              groupId,
+            ),
           );
           if (match.destinationAccountId) {
             activities.push(
-              cashAct(match.destinationAccountId, "TRANSFER_IN", dt, absAmt, `<- TR: ${desc}${timeTag(dt)}`),
+              cashAct(
+                match.destinationAccountId,
+                "TRANSFER_IN",
+                dt,
+                absAmt,
+                `<- TR: ${desc}${timeTag(dt)}`,
+                undefined,
+                groupId,
+              ),
             );
           }
         } else {
@@ -420,6 +503,7 @@ export function transform(rows: TrRow[], config: AddonSettings): TransformResult
         const match = matchPattern(cpiban, desc, transferPatterns);
 
         if (match) {
+          const groupId = match.destinationAccountId ? `xfer-${r.transaction_id}` : undefined;
           activities.push(
             cashAct(
               cashAccountId,
@@ -427,11 +511,21 @@ export function transform(rows: TrRow[], config: AddonSettings): TransformResult
               dt,
               absAmt,
               `-> ${match.label}: ${desc}` + (cpname ? ` (${cpname})` : "") + timeTag(dt),
+              undefined,
+              groupId,
             ),
           );
           if (match.destinationAccountId) {
             activities.push(
-              cashAct(match.destinationAccountId, "TRANSFER_IN", dt, absAmt, `<- TR: ${desc}${timeTag(dt)}`),
+              cashAct(
+                match.destinationAccountId,
+                "TRANSFER_IN",
+                dt,
+                absAmt,
+                `<- TR: ${desc}${timeTag(dt)}`,
+                undefined,
+                groupId,
+              ),
             );
           }
         } else {

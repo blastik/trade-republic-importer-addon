@@ -363,6 +363,15 @@ export function ImportPage({ ctx }: { ctx: AddonContext }) {
   const handleImport = useCallback(async () => {
     if (!checked) return;
 
+    // checkImport round-trips through the backend, which drops our custom
+    // transferGroupId (ActivityImport has no such field) — so re-derive the
+    // lineNumber -> transferGroupId mapping from the pre-checkImport transform
+    // output, since lineNumber does survive checkImport.
+    const groupIdByLine = new Map<number, string>();
+    for (const a of parseResult?.activities ?? []) {
+      if (a.transferGroupId && a.lineNumber != null) groupIdByLine.set(a.lineNumber, a.transferGroupId);
+    }
+
     const dups = checked.filter((a) => activityStatus(a) === "duplicate");
     const userSkippedCount = dups.filter(
       (a) => a.lineNumber != null && excludedLines.has(a.lineNumber),
@@ -383,6 +392,7 @@ export function ImportPage({ ctx }: { ctx: AddonContext }) {
     try {
       for (let i = 0; i < candidates.length; i++) {
         const a = candidates[i];
+        const sourceGroupId = a.lineNumber != null ? groupIdByLine.get(a.lineNumber) : undefined;
         const assetInput =
           a.symbol || a.assetId
             ? {
@@ -414,6 +424,7 @@ export function ImportPage({ ctx }: { ctx: AddonContext }) {
               fxRate: a.fxRate,
               comment: a.comment,
               asset: assetInput,
+              sourceGroupId,
             };
             await ctx.api.activities.update(upd);
           } else {
@@ -430,6 +441,7 @@ export function ImportPage({ ctx }: { ctx: AddonContext }) {
               fxRate: a.fxRate,
               comment: a.comment,
               asset: assetInput,
+              sourceGroupId,
             };
             await ctx.api.activities.create(cre);
           }
@@ -466,7 +478,7 @@ export function ImportPage({ ctx }: { ctx: AddonContext }) {
       setCheckError(String(e));
       setStep("confirm");
     }
-  }, [checked, excludedLines, ctx]);
+  }, [checked, excludedLines, ctx, parseResult]);
 
   // ── Reset ─────────────────────────────────────────────────────────────────
 

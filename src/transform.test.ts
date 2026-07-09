@@ -72,6 +72,10 @@ describe("BUY", () => {
     expect(transferIn.activityType).toBe("TRANSFER_IN");
     expect(transferIn.accountId).toBe("portfolio");
 
+    // Both legs share a transferGroupId so Wealthfolio excludes the pair from spending.
+    expect(transferOut.transferGroupId).toBeTruthy();
+    expect(transferOut.transferGroupId).toBe(transferIn.transferGroupId);
+
     expect(buy.activityType).toBe("BUY");
     expect(buy.accountId).toBe("portfolio");
     expect(buy.symbol).toBe("AAPL");
@@ -146,6 +150,9 @@ describe("SELL", () => {
 
     const cashIn = activities.find((a) => a.activityType === "TRANSFER_IN")!;
     expect(cashIn.accountId).toBe("cash");
+
+    expect(out.transferGroupId).toBeTruthy();
+    expect(out.transferGroupId).toBe(cashIn.transferGroupId);
   });
 });
 
@@ -266,6 +273,9 @@ describe("DIVIDEND", () => {
 
     const cashIn = activities.find((a) => a.activityType === "TRANSFER_IN")!;
     expect(cashIn.accountId).toBe("cash");
+
+    expect(out.transferGroupId).toBeTruthy();
+    expect(out.transferGroupId).toBe(cashIn.transferGroupId);
   });
 
   it("foreign-currency dividend includes fxRate and converts tax", () => {
@@ -334,6 +344,9 @@ describe("Transfer patterns", () => {
     expect(activities[0].accountId).toBe("cash");
     expect(activities[1].activityType).toBe("TRANSFER_IN");
     expect(activities[1].accountId).toBe("broker-acc");
+
+    expect(activities[0].transferGroupId).toBeTruthy();
+    expect(activities[0].transferGroupId).toBe(activities[1].transferGroupId);
   });
 
   it("unmatched TRANSFER_OUTBOUND → plain WITHDRAWAL", () => {
@@ -363,6 +376,65 @@ describe("Transfer patterns", () => {
     );
     expect(activities[0].activityType).toBe("TRANSFER_OUT");
     expect(activities[0].comment).toContain("Employer");
+  });
+
+  it("matched pattern without destinationAccountId → lone TRANSFER_OUT, no group id", () => {
+    const config: AddonSettings = {
+      ...CONFIG,
+      transferPatterns: [{ keyword: "SALARY", label: "Employer" }],
+    };
+    const { activities } = transform(
+      [
+        row({
+          category: "CASH",
+          type: "TRANSFER_OUTBOUND",
+          amount: "-100",
+          description: "Monthly salary payment",
+        }),
+      ],
+      config,
+    );
+    expect(activities).toHaveLength(1);
+    expect(activities[0].transferGroupId).toBeUndefined();
+  });
+
+  it("matched IBAN on CUSTOMER_OUTBOUND_REQUEST produces TRANSFER_OUT + TRANSFER_IN, grouped", () => {
+    const config: AddonSettings = {
+      ...CONFIG,
+      transferPatterns: [
+        { iban: "DE89370400440532013000", label: "Broker", destinationAccountId: "broker-acc" },
+      ],
+    };
+
+    const { activities } = transform(
+      [
+        row({
+          category: "CASH",
+          type: "CUSTOMER_OUTBOUND_REQUEST",
+          amount: "-1000",
+          counterparty_iban: "DE89370400440532013000",
+        }),
+      ],
+      config,
+    );
+
+    expect(activities).toHaveLength(2);
+    expect(activities[0].activityType).toBe("TRANSFER_OUT");
+    expect(activities[0].accountId).toBe("cash");
+    expect(activities[1].activityType).toBe("TRANSFER_IN");
+    expect(activities[1].accountId).toBe("broker-acc");
+    expect(activities[0].transferGroupId).toBeTruthy();
+    expect(activities[0].transferGroupId).toBe(activities[1].transferGroupId);
+  });
+
+  it("unmatched CUSTOMER_OUTBOUND_REQUEST → plain WITHDRAWAL (unchanged)", () => {
+    const { activities } = transform(
+      [row({ category: "CASH", type: "CUSTOMER_OUTBOUND_REQUEST", amount: "-200" })],
+      CONFIG,
+    );
+    expect(activities).toHaveLength(1);
+    expect(activities[0].activityType).toBe("WITHDRAWAL");
+    expect(activities[0].amount).toBe("200");
   });
 });
 
@@ -488,6 +560,26 @@ describe("CSV fixture integration", () => {
       (a) => a.activityType === "TRANSFER_IN" && a.comment?.includes("Dividend"),
     )!;
     expect(divIn.accountId).toBe("cash");
+
+    expect(divOut.transferGroupId).toBeTruthy();
+    expect(divOut.transferGroupId).toBe(divIn.transferGroupId);
+  });
+
+  it("every internal TRANSFER_OUT/TRANSFER_IN pair shares a transferGroupId; unmatched WITHDRAWAL doesn't", () => {
+    const transfers = activities.filter(
+      (a) => a.activityType === "TRANSFER_OUT" || a.activityType === "TRANSFER_IN",
+    );
+    const grouped = transfers.filter((a) => a.transferGroupId);
+    // BUY, DIVIDEND funding pairs = 2 pairs = 4 legs (SELL isn't in this fixture)
+    expect(grouped).toHaveLength(4);
+    for (const groupId of new Set(grouped.map((a) => a.transferGroupId))) {
+      expect(grouped.filter((a) => a.transferGroupId === groupId)).toHaveLength(2);
+    }
+
+    const unmatchedWithdrawal = activities.find(
+      (a) => a.activityType === "WITHDRAWAL" && a.comment?.startsWith("Outgoing transfer for Jane Doe"),
+    )!;
+    expect(unmatchedWithdrawal.transferGroupId).toBeUndefined();
   });
 
   it("INTEREST_PAYMENT → INTEREST to cash", () => {

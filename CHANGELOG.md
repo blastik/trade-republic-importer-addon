@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.0] - 2026-07-09
+
+### Changed
+
+- Migrated to Wealthfolio Addon SDK 3.6.1. Wealthfolio 3.6 runs addons in an isolated sandbox iframe — routes now render via `ctx.router.add({ render })` into a host-provided DOM node instead of the old `component: React.lazy(...)` pattern, and React/ReactDOM are imported directly (`react`, `react-dom/client`) instead of via SDK re-exports. The sidebar icon is now a host-drawn icon name (`bank`) instead of a custom SVG. No user-facing behavior changes.
+- `manifest.json` now declares `minWealthfolioVersion` (3.6.0) and `hostDependencies`; the build externalizes `react`, `react-dom`, `@wealthfolio/addon-sdk`, and `@wealthfolio/ui` as ESM imports instead of bundling them with global-variable mapping.
+
 ## [1.1.1] - 2026-07-09
 
 ### Fixed

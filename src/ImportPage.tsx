@@ -304,6 +304,12 @@ export function ImportPage({ ctx }: { ctx: AddonContext }) {
     async (file: File) => {
       if (!settings) return;
       setFileError("");
+
+      if (!file.name.toLowerCase().endsWith(".csv")) {
+        setFileError("Please upload a .csv file exported from Trade Republic.");
+        return;
+      }
+
       let text: string;
       try {
         text = await file.text();

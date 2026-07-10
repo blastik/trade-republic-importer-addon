@@ -6,11 +6,10 @@
   "main": "dist/addon.js",
   "author": "blastik",
   "license": "MIT",
-  "homepage": "https://github.com/wealthfolio/wealthfolio-addons/tree/main/community/verified/trade-republic-importer-addon",
+  "homepage": "https://github.com/blastik/trade-republic-importer-addon",
   "repository": {
     "type": "git",
-    "url": "https://github.com/wealthfolio/wealthfolio-addons.git",
-    "directory": "community/verified/trade-republic-importer-addon"
+    "url": "https://github.com/blastik/trade-republic-importer-addon.git"
   },
   "keywords": ["wealthfolio", "addon", "trade-republic", "importer", "csv"],
   "scripts": {

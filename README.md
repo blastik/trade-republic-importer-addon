@@ -11,7 +11,14 @@ accounts you select in Settings.
 
 ## Setup
 
-1. Install the addon in Wealthfolio from the community registry (or manually install from a GitHub release)
+1. Install the addon:
+   - Download the `trade-republic-importer-addon.zip` asset from the
+     [latest release](https://github.com/blastik/trade-republic-importer-addon/releases/latest)
+   - In Wealthfolio, go to **Settings → Add-ons**, click **Install from File**, and
+     select the downloaded zip
+   - This addon is registered in Wealthfolio's community addon directory for
+     discovery, but that tier doesn't include in-app one-click installation —
+     it must always be installed manually as described above
 2. Go to **Trade Republic → Settings**
 3. Select your **Cash account** and **Portfolio account**
 4. Optionally add **Transfer Patterns** to categorise recurring bank transfers

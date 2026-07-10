@@ -19,11 +19,11 @@ import {
   TabsTrigger,
 } from "@wealthfolio/ui";
 import Papa from "papaparse";
-import { loadSettings } from "./settings";
+import { loadSettings, saveSettings } from "./settings";
 import { SecurityMappingStep } from "./SecurityMappingStep";
 import type { SecurityInfo, SecurityMapping } from "./SecurityMappingStep";
 import { transform } from "./transform";
-import type { AddonSettings, SkippedRow, TransformResult, TrRow } from "./types";
+import type { ActivityImportEx, AddonSettings, SkippedRow, TransformResult, TrRow } from "./types";
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -60,6 +60,31 @@ function displayAmount(a: ActivityImport): string {
     return `${(parseFloat(String(a.quantity)) * parseFloat(String(a.unitPrice))).toFixed(2)} ${ccy}`;
   }
   return "—";
+}
+
+// Applies resolved ISIN -> ticker mappings to the transform() output, turning
+// the placeholder ISIN symbol into the real (or custom) asset fields.
+function applySecurityMappings(
+  activities: ActivityImportEx[],
+  resolvedMappings: Map<string, SecurityMapping>,
+): ActivityImportEx[] {
+  return activities.map((a) => {
+    if (!a.symbol || a.symbol === "$CASH-EUR") return a;
+    const m = resolvedMappings.get(a.symbol);
+    if (!m || m === "custom") return a;
+    return {
+      ...a,
+      symbol: m.canonicalSymbol || m.symbol,
+      symbolName: m.shortName,
+      exchangeMic: m.canonicalExchangeMic || m.exchangeMic,
+      quoteCcy: m.currency || a.quoteCcy,
+      instrumentType:
+        m.quoteType === "EQUITY" ? "EQUITY" : m.quoteType === "ETF" ? "FUND" : a.instrumentType,
+      providerId: m.providerId,
+      providerSymbol: m.providerSymbol,
+      assetId: m.existingAssetId,
+    };
+  });
 }
 
 // ─── UploadZone ─────────────────────────────────────────────────────────────
@@ -260,26 +285,17 @@ export function ImportPage({ ctx }: { ctx: AddonContext }) {
   const handleMappingsComplete = useCallback(
     (resolvedMappings: Map<string, SecurityMapping>) => {
       if (!parseResult) return;
-      const mapped = parseResult.activities.map((a) => {
-        if (!a.symbol || a.symbol === "$CASH-EUR") return a;
-        const m = resolvedMappings.get(a.symbol);
-        if (!m || m === "custom") return a;
-        return {
-          ...a,
-          symbol: m.canonicalSymbol || m.symbol,
-          symbolName: m.shortName,
-          exchangeMic: m.canonicalExchangeMic || m.exchangeMic,
-          quoteCcy: m.currency || a.quoteCcy,
-          instrumentType:
-            m.quoteType === "EQUITY" ? "EQUITY" : m.quoteType === "ETF" ? "FUND" : a.instrumentType,
-          providerId: m.providerId,
-          providerSymbol: m.providerSymbol,
-          assetId: m.existingAssetId,
-        };
-      });
-      void runCheckImport(mapped);
+      void runCheckImport(applySecurityMappings(parseResult.activities, resolvedMappings));
+
+      if (settings) {
+        const merged = { ...settings.securityMappings };
+        for (const [isin, m] of resolvedMappings) merged[isin] = m;
+        const next = { ...settings, securityMappings: merged };
+        setSettings(next);
+        void saveSettings(ctx, next);
+      }
     },
-    [parseResult, runCheckImport],
+    [parseResult, runCheckImport, settings, ctx],
   );
 
   // ── Upload & transform ────────────────────────────────────────────────────
@@ -288,6 +304,12 @@ export function ImportPage({ ctx }: { ctx: AddonContext }) {
     async (file: File) => {
       if (!settings) return;
       setFileError("");
+
+      if (!file.name.toLowerCase().endsWith(".csv")) {
+        setFileError("Please upload a .csv file exported from Trade Republic.");
+        return;
+      }
+
       let text: string;
       try {
         text = await file.text();
@@ -305,7 +327,6 @@ export function ImportPage({ ctx }: { ctx: AddonContext }) {
       const result = transform(parsed.data, settings);
       setParseResult(result);
       setFileName(file.name);
-      setMappings(new Map());
       setChecked(null);
       setExcludedLines(new Set());
       setShowDuplicatesOnly(false);
@@ -325,11 +346,23 @@ export function ImportPage({ ctx }: { ctx: AddonContext }) {
       const secs = Array.from(secMap.values());
       setSecurities(secs);
 
-      // If there are securities, go to mapping step; otherwise skip straight to checking
-      if (secs.length > 0) {
-        setStep("asset-review");
-      } else {
+      // Pre-fill mappings already resolved in a previous import, so recurring
+      // securities don't need to be mapped again.
+      const prefilled = new Map<string, SecurityMapping>();
+      for (const s of secs) {
+        const known = settings.securityMappings[s.isin];
+        if (known) prefilled.set(s.isin, known);
+      }
+      setMappings(prefilled);
+
+      if (secs.length === 0) {
         await runCheckImport(result.activities);
+      } else if (secs.every((s) => prefilled.has(s.isin))) {
+        // Every security is already known from a previous import — skip the
+        // review step entirely.
+        await runCheckImport(applySecurityMappings(result.activities, prefilled));
+      } else {
+        setStep("asset-review");
       }
     },
     [settings, runCheckImport],

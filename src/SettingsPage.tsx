@@ -19,6 +19,11 @@ import {
 import { loadSettings, saveSettings } from "./settings";
 import type { AddonSettings, TransferPattern } from "./types";
 
+function securityMappingLabel(m: AddonSettings["securityMappings"][string]): string {
+  if (m === "custom") return "Custom (ISIN as symbol)";
+  return `${m.canonicalSymbol || m.symbol}${m.shortName ? ` — ${m.shortName}` : ""}`;
+}
+
 function AccountSelect({
   accounts,
   value,
@@ -94,6 +99,13 @@ export function SettingsPage({ ctx }: { ctx: AddonContext }) {
     set({ transferPatterns: settings.transferPatterns.filter((_, idx) => idx !== i) });
 
   const addPattern = () => set({ transferPatterns: [...settings.transferPatterns, { label: "" }] });
+
+  const removeSecurityMapping = (isin: string) => {
+    const { [isin]: _removed, ...rest } = settings.securityMappings;
+    set({ securityMappings: rest });
+  };
+
+  const clearAllSecurityMappings = () => set({ securityMappings: {} });
 
   const handleSave = async () => {
     if (!settings.cashAccountId || !settings.portfolioAccountId) {
@@ -236,6 +248,40 @@ export function SettingsPage({ ctx }: { ctx: AddonContext }) {
             <Icons.Plus className="mr-1 h-4 w-4" />
             Add pattern
           </Button>
+        </CardContent>
+      </Card>
+
+      {/* Security mappings */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Security mappings</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-muted-foreground text-xs">
+            Once an ISIN is mapped to a ticker (or marked custom) during import, it's remembered
+            here so future imports of the same security skip the mapping step. Remove an entry to
+            be asked again next time it's imported.
+          </p>
+          {Object.keys(settings.securityMappings).length === 0 ? (
+            <p className="text-muted-foreground text-xs italic">No security mappings saved yet.</p>
+          ) : (
+            <>
+              <div className="space-y-1">
+                {Object.entries(settings.securityMappings).map(([isin, mapping]) => (
+                  <PatternRow key={isin} onRemove={() => removeSecurityMapping(isin)}>
+                    <span className="w-32 shrink-0 font-mono text-xs font-bold">{isin}</span>
+                    <span className="text-muted-foreground min-w-0 flex-1 truncate text-xs">
+                      {securityMappingLabel(mapping)}
+                    </span>
+                  </PatternRow>
+                ))}
+              </div>
+              <Button type="button" variant="outline" size="sm" onClick={clearAllSecurityMappings}>
+                <Icons.Trash className="mr-1 h-4 w-4" />
+                Clear all
+              </Button>
+            </>
+          )}
         </CardContent>
       </Card>
 

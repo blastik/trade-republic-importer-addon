@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { AddonContext, SymbolSearchResult } from "@wealthfolio/addon-sdk";
 import { Button, Card, CardContent, Icons, Input } from "@wealthfolio/ui";
+import type { SecurityMapping } from "./types";
+
+export type { SecurityMapping } from "./types";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -9,8 +12,6 @@ export interface SecurityInfo {
   name: string;
   count: number;
 }
-
-export type SecurityMapping = SymbolSearchResult | "custom";
 
 // ─── TickerSearchInput ────────────────────────────────────────────────────────
 

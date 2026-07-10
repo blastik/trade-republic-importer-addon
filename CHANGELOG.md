@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.3.0] - 2026-07-10
+
+### Added
+
+- Security mappings (ISIN → ticker or "custom") are now persisted across imports. Once a security is resolved, future imports of the same ISIN skip the mapping step entirely. Settings gained a "Security mappings" section to review or clear saved mappings.
+
+### Fixed
+
+- Uploading a non-CSV file (e.g. a zip) is now rejected before parsing, instead of producing confusing results from misread binary content.
+
 ## [1.2.0] - 2026-07-09
 
 ### Changed

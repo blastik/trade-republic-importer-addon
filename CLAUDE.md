@@ -45,13 +45,15 @@ pnpm dev              # vite build --watch
 
 ## Releasing
 
-Bump the `version` field in **both** `manifest.json` and `package.json`, update `CHANGELOG.md`, then push/merge to `main`. The release workflow will:
+The release workflow never bumps the version itself — it only creates a GitHub release when `manifest.json`'s version has no matching git tag yet, so a merge to `main` without a version bump runs CI but publishes nothing. This is the deliberate gate for "only release on real changes": whenever a change to this addon touches actual logic (anything under `src/`, `manifest.json` permissions/metadata, transaction-mapping behavior, etc.) rather than just docs/CI/README, **proactively propose a semver bump** (patch/minor/major, with reasoning) before merging — don't wait to be asked. Docs-only or pipeline-only changes should merge without a bump.
 
-1. Run type-check, tests, and build
+Once a bump is agreed, apply it by bumping the `version` field in **both** `manifest.json` and `package.json`, and add a `CHANGELOG.md` entry, then push/merge to `main`. The release workflow will:
+
+1. Run type-check, tests, and `pnpm bundle`
 2. Detect the new version tag doesn't exist yet
-3. Create a GitHub release `v{version}` with the changelog section and `dist/addon.js` attached
+3. Create a GitHub release `v{version}` with the changelog section, `dist/trade-republic-importer-addon.zip` (the installable package), and `dist/addon.js` attached
 
-The wealthfolio-addons community registry JSON should reference the `dist/addon.js` asset URL from the GitHub release.
+This addon is registered in the wealthfolio-addons community registry as an unverified directory listing (discovery only, no in-app one-click install) — end users always install manually from the GitHub release zip, per the flow documented in `README.md`.
 
 ## Two-account model
 

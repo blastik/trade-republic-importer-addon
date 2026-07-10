@@ -1,6 +1,6 @@
 {
   "name": "trade-republic-importer-addon",
-  "version": "1.3.0",
+  "version": "1.3.1",
   "description": "Import Trade Republic CSV exports into Wealthfolio",
   "type": "module",
   "main": "dist/addon.js",

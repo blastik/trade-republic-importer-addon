@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.3.1] - 2026-07-10
+
+### Fixed
+
+- Navigating between Import and Settings could silently stop working (clicking the tab did nothing) after the sandbox iframe migration in 1.2.0. Each route was creating its own React root, but the sandbox hands every route the same DOM container — the second `createRoot()` call collided with the still-live first one and its output was never shown. All routes now share a single root, as the SDK's own pattern expects.
+
 ## [1.3.0] - 2026-07-10
 
 ### Added

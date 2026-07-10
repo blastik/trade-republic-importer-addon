@@ -24,22 +24,6 @@ function SettingsWrapper({ ctx }: { ctx: AddonContext }) {
   );
 }
 
-// Each route gets its own DOM node from the host, so each needs its own React
-// root — created once and reused across re-renders of that route.
-function mountRoute(node: () => ReactElement) {
-  let root: Root | null = null;
-  return {
-    render: ({ root: routeRoot }: AddonRouteRenderContext) => {
-      root ??= createRoot(routeRoot);
-      root.render(node());
-    },
-    unmount: () => {
-      root?.unmount();
-      root = null;
-    },
-  };
-}
-
 export default function enable(ctx: AddonContext) {
   const sidebarItem = ctx.sidebar.addItem({
     id: ADDON_ID,
@@ -49,29 +33,34 @@ export default function enable(ctx: AddonContext) {
     order: 100,
   });
 
-  const importRoute = mountRoute(() => <ImportWrapper ctx={ctx} />);
-  const importRouteAlias = mountRoute(() => <ImportWrapper ctx={ctx} />);
-  const settingsRoute = mountRoute(() => <SettingsWrapper ctx={ctx} />);
+  // The sandbox hands every route the same DOM node (one container per addon,
+  // not per route), so all routes must share a single React root — creating
+  // more than one root on that node leaves earlier roots' content in place
+  // and silently breaks rendering of whichever route mounts second.
+  let root: Root | null = null;
+  const renderInto = (jsx: ReactElement, { root: routeRoot }: AddonRouteRenderContext) => {
+    root ??= createRoot(routeRoot);
+    root.render(jsx);
+  };
 
   ctx.router.add({
     path: `/addon/${ADDON_ID}`,
-    render: importRoute.render,
+    render: (context) => renderInto(<ImportWrapper ctx={ctx} />, context),
   });
 
   ctx.router.add({
     path: `/addon/${ADDON_ID}/import`,
-    render: importRouteAlias.render,
+    render: (context) => renderInto(<ImportWrapper ctx={ctx} />, context),
   });
 
   ctx.router.add({
     path: `/addon/${ADDON_ID}/settings`,
-    render: settingsRoute.render,
+    render: (context) => renderInto(<SettingsWrapper ctx={ctx} />, context),
   });
 
   ctx.onDisable(() => {
-    importRoute.unmount();
-    importRouteAlias.unmount();
-    settingsRoute.unmount();
+    root?.unmount();
+    root = null;
     try {
       sidebarItem.remove();
     } catch (e) {

@@ -29,7 +29,7 @@ jobs:
 
       - run: pnpm test
 
-      - run: pnpm build
+      - run: pnpm bundle
 
       - name: Extract version
         id: version
@@ -58,4 +58,6 @@ jobs:
           tag_name: v${{ steps.version.outputs.version }}
           name: v${{ steps.version.outputs.version }}
           body_path: release-notes.md
-          files: dist/addon.js
+          files: |
+            dist/trade-republic-importer-addon.zip
+            dist/addon.js

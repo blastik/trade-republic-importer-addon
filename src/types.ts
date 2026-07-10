@@ -1,4 +1,4 @@
-import type { ActivityImport } from "@wealthfolio/addon-sdk";
+import type { ActivityImport, SymbolSearchResult } from "@wealthfolio/addon-sdk";
 
 export interface TrRow {
   datetime: string;
@@ -33,11 +33,18 @@ export interface TransferPattern {
   destinationAccountId?: string;
 }
 
+// Resolution for one Trade Republic ISIN: either a chosen ticker (from
+// ctx.api.market.searchTicker) or "custom" to keep the ISIN as the symbol.
+export type SecurityMapping = SymbolSearchResult | "custom";
+
 export interface AddonSettings {
   cashAccountId: string;
   cashCurrency: string;
   portfolioAccountId: string;
   transferPatterns: TransferPattern[];
+  // ISIN -> resolved mapping, persisted so recurring imports of the same
+  // security don't require re-mapping every time.
+  securityMappings: Record<string, SecurityMapping>;
 }
 
 export interface SkippedRow {

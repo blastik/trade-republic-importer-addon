@@ -13,6 +13,7 @@ const CONFIG: AddonSettings = {
   cashCurrency: "EUR",
   portfolioAccountId: "portfolio",
   transferPatterns: [],
+  securityMappings: {},
 };
 
 function row(overrides: Partial<TrRow>): TrRow {

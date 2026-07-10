@@ -8,6 +8,7 @@ export const DEFAULT_SETTINGS: AddonSettings = {
   cashCurrency: "EUR",
   portfolioAccountId: "",
   transferPatterns: [],
+  securityMappings: {},
 };
 
 export async function loadSettings(ctx: AddonContext): Promise<AddonSettings> {

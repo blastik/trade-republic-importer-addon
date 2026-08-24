@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.2] - 2026-08-24
+
+### Changed
+
+- Bumped the Wealthfolio host SDK family (`@wealthfolio/addon-sdk`, `@wealthfolio/ui`, `@wealthfolio/addon-dev-tools`) from 3.6.1 to 3.7.0, and refreshed other in-range dependencies (`papaparse`, `react`/`react-dom`, `tailwindcss`, `vitest`, and associated type packages). `manifest.json`'s `sdkVersion` and `hostDependencies` are updated to match. No behavior changes — type-check, tests, and build all pass unmodified.
+- Added `.github/dependabot.yml` to check for dependency updates monthly.
+
 ## [1.3.1] - 2026-07-10
 
 ### Fixed

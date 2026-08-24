@@ -77,3 +77,7 @@ of your choice.
   uses to recognise it as an internal transfer rather than an expense. A
   Transfer Pattern left without a destination account (i.e. a genuine external
   transfer) is recorded as a plain `WITHDRAWAL` and correctly counts as spending.
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for local setup, fixture conventions, and versioning/release notes.

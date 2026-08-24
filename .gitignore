@@ -32,3 +32,6 @@ yarn-error.log*
 
 # TypeScript
 *.tsbuildinfo
+
+# Un-ignore .tool-versions (asdf), even though it's ignored globally on some machines
+!.tool-versions

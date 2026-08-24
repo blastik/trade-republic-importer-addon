@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.3.3] - 2026-08-24
+
+### Changed
+
+- Bumped `vite` (7→8), `@vitejs/plugin-react` (4→6), `typescript` (5→6), `@types/node` (20→24, matching the pinned Node 24 runtime), `papaparse` (5.6.1→5.7.0), and pnpm (10→11). Verified `dist/addon.js` still externalizes host-provided dependencies correctly under vite 8's new Rolldown-based bundler. No behavior changes — type-check, tests, and build all pass unmodified.
+
 ## [1.3.2] - 2026-08-24
 
 ### Changed

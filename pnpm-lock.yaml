@@ -31,14 +31,14 @@ importers:
         specifier: ^6.1.1
         version: 6.1.1(vite@8.2.2(@types/node@24.13.3)(jiti@2.7.0))
       '@wealthfolio/addon-dev-tools':
-        specifier: ^3.7.0
-        version: 3.7.0
+        specifier: ^3.9.0
+        version: 3.9.0
       '@wealthfolio/addon-sdk':
-        specifier: ^3.7.0
-        version: 3.7.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+        specifier: ^3.9.0
+        version: 3.9.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@wealthfolio/ui':
-        specifier: ^3.7.0
-        version: 3.7.0(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(i18next@25.10.10(typescript@6.0.3))(react-dom@19.2.8(react@19.2.8))(react-i18next@16.6.6(i18next@25.10.10(typescript@6.0.3))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@6.0.3))(react-is@16.13.1)(react@19.2.8)(redux@5.0.1)
+        specifier: ^3.9.0
+        version: 3.9.0(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(i18next@25.10.10(typescript@6.0.3))(react-dom@19.2.8(react@19.2.8))(react-i18next@16.6.6(i18next@25.10.10(typescript@6.0.3))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@6.0.3))(react-is@16.13.1)(react@19.2.8)(redux@5.0.1)
       react:
         specifier: ^19.2.8
         version: 19.2.8
@@ -1034,20 +1034,20 @@ packages:
   '@vitest/spy@5.0.2':
     resolution: {integrity: sha512-Ijc7T1nT9efNb5LxvjaBrEqw3f/QwUv5EE0nKqZxgqsaV/FxAAZ8baGylA8X/Z2oS4Lp+K74Jr6dTJsDKxJDeg==}
 
-  '@wealthfolio/addon-dev-tools@3.7.0':
-    resolution: {integrity: sha512-BVCHMj8Y4W+fqKqOELQ+UQNSJIH0VxIG10iEk9jVK6OoyCxdQaILY6hHq5FtdFrw6DWrYq1/wge6EaDDODxWZg==}
+  '@wealthfolio/addon-dev-tools@3.9.0':
+    resolution: {integrity: sha512-KWZZpRo6vscVXvtCa/9l9pUQ0ygO4ehaoCOfEGoPyJEqA+huyDDxNXA1MSzZcrStVfquvS69j03ZpWY06sE99A==}
     engines: {node: '>=20.0.0'}
     hasBin: true
 
-  '@wealthfolio/addon-sdk@3.7.0':
-    resolution: {integrity: sha512-bXPMV0IWc1voIawdOMrE4RVT4NGVVFRnZDQZSuqyaqbziJ2gm7L2DpqZs6UhVvRjnjIvHrNYYvtgvEFzPFR+Nw==}
+  '@wealthfolio/addon-sdk@3.9.0':
+    resolution: {integrity: sha512-Shx0RTdsQGdXytPX6spcYNQ6PwmkqJFeqkQQaUpd2jF+laaIBPqj7t7xqdquY9xGInXpDgs5JQ/Cl6JbzDd5jQ==}
     engines: {node: '>=20.0.0'}
     peerDependencies:
       react: ^19.2.4
       react-dom: ^19.2.4
 
-  '@wealthfolio/ui@3.7.0':
-    resolution: {integrity: sha512-0m1BjyK84aHJt64o6lLwosaz20W3EPsJp342JEQPoIjq9KFQIHQ0TSJw7HiMPkJKH+PvOSLrQ24nuvEV6RmWgg==}
+  '@wealthfolio/ui@3.9.0':
+    resolution: {integrity: sha512-FiKvsNkfKjIadnYQBme4OnVGvIww94en8ZlwGTemOQVdhEtIB92Ypitk0m5JMz0nvYA0dwus4S78kgFI2SnVWA==}
     peerDependencies:
       i18next: ^25.6.0
       react: ^19.2.4
@@ -3005,7 +3005,7 @@ snapshots:
 
   '@vitest/spy@5.0.2': {}
 
-  '@wealthfolio/addon-dev-tools@3.7.0':
+  '@wealthfolio/addon-dev-tools@3.9.0':
     dependencies:
       chokidar: 4.0.3
       commander: 14.0.3
@@ -3014,12 +3014,12 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@wealthfolio/addon-sdk@3.7.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8)':
+  '@wealthfolio/addon-sdk@3.9.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8)':
     dependencies:
       react: 19.2.8
       react-dom: 19.2.8(react@19.2.8)
 
-  '@wealthfolio/ui@3.7.0(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(i18next@25.10.10(typescript@6.0.3))(react-dom@19.2.8(react@19.2.8))(react-i18next@16.6.6(i18next@25.10.10(typescript@6.0.3))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@6.0.3))(react-is@16.13.1)(react@19.2.8)(redux@5.0.1)':
+  '@wealthfolio/ui@3.9.0(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(i18next@25.10.10(typescript@6.0.3))(react-dom@19.2.8(react@19.2.8))(react-i18next@16.6.6(i18next@25.10.10(typescript@6.0.3))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@6.0.3))(react-is@16.13.1)(react@19.2.8)(redux@5.0.1)':
     dependencies:
       '@internationalized/date': 3.12.3
       '@internationalized/number': 3.6.7

@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.4] - 2026-10-01
+
+### Changed
+
+- Bumped the Wealthfolio host SDK family (`@wealthfolio/addon-sdk`, `@wealthfolio/ui`, `@wealthfolio/addon-dev-tools`) from 3.7.0 to 3.9.0. `manifest.json`'s `sdkVersion` and `hostDependencies` are updated to match, and `minWealthfolioVersion` is raised from 3.6.0 to 3.9.0 — **this release requires Wealthfolio 3.9 or later**. The SDK changes are additive and the addon's own behavior is unchanged.
+- Bumped `vitest` (4→5) and `@vitejs/plugin-react` (6.1.0→6.1.1).
+
 ## [1.3.3] - 2026-08-24
 
 ### Changed

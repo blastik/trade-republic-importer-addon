@@ -34,8 +34,8 @@ importers:
         specifier: ^3.7.0
         version: 3.7.0
       '@wealthfolio/addon-sdk':
-        specifier: ^3.7.0
-        version: 3.7.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+        specifier: ^3.9.0
+        version: 3.9.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@wealthfolio/ui':
         specifier: ^3.7.0
         version: 3.7.0(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(i18next@25.10.10(typescript@6.0.3))(react-dom@19.2.8(react@19.2.8))(react-i18next@16.6.6(i18next@25.10.10(typescript@6.0.3))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@6.0.3))(react-is@16.13.1)(react@19.2.8)(redux@5.0.1)
@@ -1039,8 +1039,8 @@ packages:
     engines: {node: '>=20.0.0'}
     hasBin: true
 
-  '@wealthfolio/addon-sdk@3.7.0':
-    resolution: {integrity: sha512-bXPMV0IWc1voIawdOMrE4RVT4NGVVFRnZDQZSuqyaqbziJ2gm7L2DpqZs6UhVvRjnjIvHrNYYvtgvEFzPFR+Nw==}
+  '@wealthfolio/addon-sdk@3.9.0':
+    resolution: {integrity: sha512-Shx0RTdsQGdXytPX6spcYNQ6PwmkqJFeqkQQaUpd2jF+laaIBPqj7t7xqdquY9xGInXpDgs5JQ/Cl6JbzDd5jQ==}
     engines: {node: '>=20.0.0'}
     peerDependencies:
       react: ^19.2.4
@@ -3014,7 +3014,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@wealthfolio/addon-sdk@3.7.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8)':
+  '@wealthfolio/addon-sdk@3.9.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8)':
     dependencies:
       react: 19.2.8
       react-dom: 19.2.8(react@19.2.8)

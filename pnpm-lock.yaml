@@ -37,8 +37,8 @@ importers:
         specifier: ^3.7.0
         version: 3.7.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@wealthfolio/ui':
-        specifier: ^3.7.0
-        version: 3.7.0(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(i18next@25.10.10(typescript@6.0.3))(react-dom@19.2.8(react@19.2.8))(react-i18next@16.6.6(i18next@25.10.10(typescript@6.0.3))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@6.0.3))(react-is@16.13.1)(react@19.2.8)(redux@5.0.1)
+        specifier: ^3.9.0
+        version: 3.9.0(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(i18next@25.10.10(typescript@6.0.3))(react-dom@19.2.8(react@19.2.8))(react-i18next@16.6.6(i18next@25.10.10(typescript@6.0.3))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@6.0.3))(react-is@16.13.1)(react@19.2.8)(redux@5.0.1)
       react:
         specifier: ^19.2.8
         version: 19.2.8
@@ -1046,8 +1046,8 @@ packages:
       react: ^19.2.4
       react-dom: ^19.2.4
 
-  '@wealthfolio/ui@3.7.0':
-    resolution: {integrity: sha512-0m1BjyK84aHJt64o6lLwosaz20W3EPsJp342JEQPoIjq9KFQIHQ0TSJw7HiMPkJKH+PvOSLrQ24nuvEV6RmWgg==}
+  '@wealthfolio/ui@3.9.0':
+    resolution: {integrity: sha512-FiKvsNkfKjIadnYQBme4OnVGvIww94en8ZlwGTemOQVdhEtIB92Ypitk0m5JMz0nvYA0dwus4S78kgFI2SnVWA==}
     peerDependencies:
       i18next: ^25.6.0
       react: ^19.2.4
@@ -3019,7 +3019,7 @@ snapshots:
       react: 19.2.8
       react-dom: 19.2.8(react@19.2.8)
 
-  '@wealthfolio/ui@3.7.0(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(i18next@25.10.10(typescript@6.0.3))(react-dom@19.2.8(react@19.2.8))(react-i18next@16.6.6(i18next@25.10.10(typescript@6.0.3))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@6.0.3))(react-is@16.13.1)(react@19.2.8)(redux@5.0.1)':
+  '@wealthfolio/ui@3.9.0(@types/react-dom@19.2.5(@types/react@19.2.18))(@types/react@19.2.18)(i18next@25.10.10(typescript@6.0.3))(react-dom@19.2.8(react@19.2.8))(react-i18next@16.6.6(i18next@25.10.10(typescript@6.0.3))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@6.0.3))(react-is@16.13.1)(react@19.2.8)(redux@5.0.1)':
     dependencies:
       '@internationalized/date': 3.12.3
       '@internationalized/number': 3.6.7

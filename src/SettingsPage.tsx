@@ -39,7 +39,7 @@ function AccountSelect({
 }) {
   const filtered = filterType ? accounts.filter((a) => a.accountType === filterType) : accounts;
   return (
-    <Select value={value} onValueChange={onChange}>
+    <Select value={value} onValueChange={(v) => v && onChange(v)}>
       <SelectTrigger className="w-full">
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
@@ -226,7 +226,7 @@ export function SettingsPage({ ctx }: { ctx: AddonContext }) {
               <Select
                 value={p.destinationAccountId ?? noDestOption}
                 onValueChange={(v) =>
-                  updatePattern(i, { destinationAccountId: v === noDestOption ? undefined : v })
+                  updatePattern(i, { destinationAccountId: !v || v === noDestOption ? undefined : v })
                 }
               >
                 <SelectTrigger className="w-44 shrink-0">

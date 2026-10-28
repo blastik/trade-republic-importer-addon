@@ -18,7 +18,7 @@ All business logic is in `src/transform.ts` — tests live in `src/transform.tes
 
 - **Runtime / package manager**: Node 24, pnpm 11 (versions pinned in `.tool-versions`)
 - **Build**: Vite 8 — outputs a single `dist/addon.js` (ES module, no zip)
-- **Tests**: Vitest 4 — unit tests in `src/transform.test.ts` + CSV fixture in `src/__fixtures__/`
+- **Tests**: Vitest 5 — unit tests in `src/transform.test.ts` + CSV fixture in `src/__fixtures__/`
 - **Type checking**: `tsc --noEmit`
 
 ## Key files
@@ -68,6 +68,10 @@ Buying a stock moves funds Cash → Portfolio (TRANSFER_OUT / TRANSFER_IN pair) 
 Every TRANSFER_OUT/TRANSFER_IN pair `transform.ts` generates for an internal movement (BUY funding, SELL/DIVIDEND cash sweep, or a matched Transfer Pattern with a `destinationAccountId`) is tagged with a shared `transferGroupId` (see `ActivityImportEx` in `src/types.ts`). `ImportPage.tsx` forwards that value as `sourceGroupId` on the `ActivityCreate`/`ActivityUpdate` calls it makes — this addon submits activities one at a time via `ctx.api.activities.create()`/`.update()`, never through Wealthfolio's bulk-import pipeline, so Wealthfolio's own transfer-pair auto-linker never runs; without an explicit `sourceGroupId` these pairs get miscounted as spending. `ActivityImport` (the type `transform()` returns) has no `sourceGroupId` field, and `ctx.api.activities.checkImport()` drops unknown fields, so `transferGroupId` can't ride through that round-trip — `ImportPage.tsx` re-derives it by `lineNumber` (which does survive `checkImport`) from the pre-check `transform()` output. Any new internal-transfer pair added to `transform.ts` must get its own `transferGroupId` or it will silently inflate spending.
 
 Only **outbound** CASH types (`CUSTOMER_OUTBOUND_REQUEST`, `TRANSFER_OUTBOUND`/`TRANSFER_INSTANT_OUTBOUND`, `TRANSFER_DIRECT_DEBIT_INBOUND`) check `transferPatterns` — they default to spend (`WITHDRAWAL`) unless matched to a pattern with a `destinationAccountId`, at which point they become an internal transfer. **Inbound** CASH types (`CUSTOMER_INBOUND`/`CUSTOMER_INPAYMENT`, `TRANSFER_INBOUND`/`TRANSFER_INSTANT_INBOUND`) are intentionally always `DEPOSIT` with no pattern check — an unrecognised inbound transfer is treated as external income by design, not matched against your own accounts. Keep new CASH types consistent with this outbound/inbound split rather than adding pattern-matching to inbound types.
+
+## Bank-sync deposits
+
+A bank sync (activities with `sourceSystem` `ENABLE_BANKING`) may import the destination bank's credits before the TR CSV is imported, and not every bank reports the sender, so it can't always skip TR transfers. `matchBankDeposits()` in `transform.ts` (pure, tested) pairs each pattern `TRANSFER_IN` (not on the cash/portfolio account, not a `checkImport` duplicate) with a bank-sync `DEPOSIT` on the same account, same amount and currency, within `BANK_MATCH_DAYS` (5 calendar days), closest dates first, each deposit once. `ImportPage.tsx` looks those deposits up with `ctx.api.activities.search` (DEPOSITs on the destination accounts) after `checkImport`, shows matches in the review table with a per-row "Keep both" toggle, and imports a match as an `ActivityUpdate` of the deposit (same path as duplicates) so the money exists once, linked to the TR `TRANSFER_OUT`. If the lookup fails the review shows a warning and transfers are created as new activities.
 
 ## Security mapping persistence
 

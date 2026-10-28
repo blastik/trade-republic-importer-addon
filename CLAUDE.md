@@ -18,7 +18,7 @@ All business logic is in `src/transform.ts` — tests live in `src/transform.tes
 
 - **Runtime / package manager**: Node 24, pnpm 11 (versions pinned in `.tool-versions`)
 - **Build**: Vite 8 — outputs a single `dist/addon.js` (ES module, no zip)
-- **Tests**: Vitest 4 — unit tests in `src/transform.test.ts` + CSV fixture in `src/__fixtures__/`
+- **Tests**: Vitest 5 — unit tests in `src/transform.test.ts` + CSV fixture in `src/__fixtures__/`
 - **Type checking**: `tsc --noEmit`
 
 ## Key files

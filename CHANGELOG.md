@@ -6,6 +6,10 @@
 
 - Transfers to a pattern's destination account now replace the deposit a bank sync already imported for the same money (activities with `sourceSystem` `ENABLE_BANKING`). A pattern `TRANSFER_IN` matches a `DEPOSIT` on the same account with the same amount and currency booked within 5 calendar days; the review screen shows each match ("Replaces bank deposit …") with a "Keep both" toggle, and the import turns that deposit into the linked `TRANSFER_IN` instead of creating a second activity. Needs the `activities.search` permission.
 
+### Changed
+
+- Bumped dev dependencies to latest: `typescript` (6→7), the Wealthfolio SDK family (`@wealthfolio/addon-sdk`, `@wealthfolio/ui`, `@wealthfolio/addon-dev-tools`) 3.9.0→3.11.0, `react`/`react-dom` 19.3.1, `@types/react`/`@types/react-dom` 19.3.0, `vite` 8.3.5, `vitest` 5.0.5, `@vitejs/plugin-react` 6.1.2, and `@types/node` 24.19.2 (kept on 24.x to match the pinned Node 24 runtime). `@wealthfolio/ui` 3.11's `Select`/`Progress` typings pass `null` where 3.9's passed `undefined`; the settings selects and the validation progress bar now handle both, so the addon still runs on Wealthfolio 3.9 (`minWealthfolioVersion` unchanged).
+
 ## [1.3.4] - 2026-10-01
 
 ### Changed

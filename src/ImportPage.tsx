@@ -710,7 +710,7 @@ export function ImportPage({ ctx }: { ctx: AddonContext }) {
     return (
       <div className="max-w-md space-y-4 p-6">
         <h1 className="text-2xl font-semibold">Validating…</h1>
-        <Progress value={undefined} className="animate-pulse" />
+        <Progress value={null} className="animate-pulse" />
         <p className="text-muted-foreground text-sm">
           Checking {total} activities for duplicates and errors…
         </p>

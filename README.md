@@ -64,6 +64,16 @@ Example: an IBAN `DE89 3704 0044 0532 0130 00` with label `Investment` will mark
 inbound transfers from that IBAN as a TRANSFER linked to a destination account
 of your choice.
 
+### Deposits already imported by a bank sync
+
+If a bank sync (anything that writes activities with `sourceSystem`
+`ENABLE_BANKING`) already imported the money arriving at a pattern's destination account as a
+`DEPOSIT`, the import replaces that deposit with the pattern's `TRANSFER_IN`
+instead of adding a second activity. A deposit matches when it is on the same
+account, with the same amount and currency, booked within 5 calendar days of
+the Trade Republic transfer. The review screen marks each match as "Replaces
+bank deposit"; use "Keep both" on a row if it is a different movement.
+
 ## Notes
 
 - Currency is driven by the CSV. Cash activities use the corresponding currency

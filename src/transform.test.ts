@@ -3,7 +3,8 @@ import { dirname, join } from "path";
 import { fileURLToPath } from "url";
 import Papa from "papaparse";
 import { describe, expect, it } from "vitest";
-import { transform } from "./transform";
+import { BANK_SYNC_SOURCE, matchBankDeposits, transform } from "./transform";
+import type { ActivityDetails, ActivityImport } from "@wealthfolio/addon-sdk";
 import type { AddonSettings, TrRow } from "./types";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -631,5 +632,79 @@ describe("CSV fixture integration", () => {
     )!;
     expect(dep.amount).toBe("500");
     expect(dep.accountId).toBe("cash");
+  });
+});
+
+describe("matchBankDeposits", () => {
+  const config: AddonSettings = {
+    ...CONFIG,
+    transferPatterns: [{ iban: "DE00SAVINGS", label: "Savings", destinationAccountId: "savings" }],
+  };
+  // A TR outbound transfer whose arrival on the savings account a bank sync already imported as a DEPOSIT
+  const trTransfer = row({
+    datetime: "2024-03-10T08:01:02.123456Z",
+    date: "2024-03-10",
+    category: "CASH",
+    type: "TRANSFER_OUTBOUND",
+    amount: "-500",
+    counterparty_iban: "DE00SAVINGS",
+    transaction_id: "tr-out",
+  });
+  const transferIn = (): ActivityImport =>
+    transform([trTransfer], config).activities.find((a) => a.activityType === "TRANSFER_IN")!;
+  const deposit = (overrides: Partial<ActivityDetails> = {}): ActivityDetails =>
+    ({
+      id: "dep-1",
+      accountId: "savings",
+      activityType: "DEPOSIT",
+      date: "2024-03-10T12:00:00+00:00" as unknown as Date,
+      amount: "500.00",
+      currency: "EUR",
+      sourceSystem: BANK_SYNC_SOURCE,
+      ...overrides,
+    }) as ActivityDetails;
+
+  it("links a pattern TRANSFER_IN to the bank-sync DEPOSIT for the same money", () => {
+    const a = transferIn();
+    const matches = matchBankDeposits([a], [deposit()], config);
+    expect(matches.get(a.lineNumber!)?.id).toBe("dep-1");
+  });
+
+  it("matches within 5 calendar days either way, not beyond", () => {
+    const a = transferIn();
+    expect(matchBankDeposits([a], [deposit({ date: "2024-03-15T12:00:00Z" as unknown as Date })], config).size).toBe(1);
+    expect(matchBankDeposits([a], [deposit({ date: "2024-03-05T12:00:00Z" as unknown as Date })], config).size).toBe(1);
+    expect(matchBankDeposits([a], [deposit({ date: "2024-03-16T12:00:00Z" as unknown as Date })], config).size).toBe(0);
+  });
+
+  it("needs the same account, amount and currency, and a DEPOSIT from the bank sync", () => {
+    const a = transferIn();
+    for (const d of [
+      deposit({ accountId: "other" }),
+      deposit({ amount: "500.01" }),
+      deposit({ currency: "USD" }),
+      deposit({ activityType: "TRANSFER_IN" }),
+      deposit({ sourceSystem: undefined }),
+      deposit({ sourceSystem: "MANUAL" }),
+    ]) {
+      expect(matchBankDeposits([a], [d], config).size).toBe(0);
+    }
+  });
+
+  it("uses each deposit once, picking the closest date", () => {
+    const second = row({ ...trTransfer, datetime: "2024-03-12T08:00:00.000Z", transaction_id: "tr-out-2" });
+    const ins = transform([trTransfer, second], config).activities.filter((a) => a.activityType === "TRANSFER_IN");
+    const near = deposit({ id: "near", date: "2024-03-12T12:00:00Z" as unknown as Date });
+    const matches = matchBankDeposits(ins, [near], config);
+    expect([...matches.keys()]).toEqual([ins[1].lineNumber]);
+    expect(matches.get(ins[1].lineNumber!)?.id).toBe("near");
+    expect(matchBankDeposits(ins, [near, deposit({ id: "far" })], config).size).toBe(2);
+  });
+
+  it("leaves internal cash/portfolio transfers and already-imported rows alone", () => {
+    const internal = { ...transferIn(), accountId: "cash" };
+    const reimport = { ...transferIn(), duplicateOfId: "existing" };
+    expect(matchBankDeposits([internal], [deposit({ accountId: "cash" })], config).size).toBe(0);
+    expect(matchBankDeposits([reimport], [deposit()], config).size).toBe(0);
   });
 });

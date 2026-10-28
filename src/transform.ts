@@ -1,4 +1,4 @@
-import type { ActivityImport } from "@wealthfolio/addon-sdk";
+import type { ActivityDetails, ActivityImport } from "@wealthfolio/addon-sdk";
 import type {
   ActivityImportEx,
   AddonSettings,
@@ -566,4 +566,63 @@ export function transform(rows: TrRow[], config: AddonSettings): TransformResult
   });
 
   return { activities, skipped };
+}
+
+// ─── Bank-sync deposits ──────────────────────────────────────────────────────
+//
+// A bank sync (activities with sourceSystem ENABLE_BANKING) may import the destination bank's movements more often
+// than this CSV is imported, so the credit for a matched transfer pattern can already be in Wealthfolio as a DEPOSIT.
+// Not every bank reports the sender of a transfer, so the sync can't always tell it came from Trade Republic.
+// The pattern's TRANSFER_IN then replaces that DEPOSIT (same account, amount and currency, booked within
+// BANK_MATCH_DAYS) instead of creating a second activity for the same money.
+export const BANK_SYNC_SOURCE = "ENABLE_BANKING";
+export const BANK_MATCH_DAYS = 5;
+
+const cents = (v: string | number | null | undefined): number => Math.round(Math.abs(Number(v ?? 0)) * 100);
+// Calendar days between two dates (the bank sync books at noon, TR keeps the exact time)
+const dayDiff = (a: Date | string | undefined, b: Date | string | undefined): number => {
+  const day = (v: Date | string | undefined) => Date.parse(new Date(v ?? 0).toISOString().slice(0, 10));
+  return Math.abs(day(a) - day(b)) / 86_400_000;
+};
+
+// activities: checkImport output; deposits: existing activities on the destination accounts.
+// -> lineNumber of each pattern TRANSFER_IN -> the bank-sync DEPOSIT it replaces. Closest dates pair first and each
+// deposit is used once, so two equal transfers a few days apart each get their own deposit.
+export function matchBankDeposits(
+  activities: ActivityImport[],
+  deposits: ActivityDetails[],
+  config: AddonSettings,
+): Map<number, ActivityDetails> {
+  const transfers = activities.filter(
+    (a) =>
+      a.activityType === "TRANSFER_IN" &&
+      a.lineNumber != null &&
+      !a.duplicateOfId &&
+      a.accountId !== config.cashAccountId &&
+      a.accountId !== config.portfolioAccountId,
+  );
+  const candidates = deposits.filter(
+    (d) => d.activityType === "DEPOSIT" && d.sourceSystem === BANK_SYNC_SOURCE,
+  );
+  const pairs = transfers
+    .flatMap((a) =>
+      candidates
+        .filter(
+          (d) =>
+            d.accountId === a.accountId &&
+            d.currency === a.currency &&
+            cents(d.amount) === cents(a.amount) &&
+            dayDiff(d.date, a.date) <= BANK_MATCH_DAYS,
+        )
+        .map((d) => ({ line: a.lineNumber as number, d, diff: dayDiff(d.date, a.date) })),
+    )
+    .sort((x, y) => x.diff - y.diff);
+  const used = new Set<string>();
+  const matches = new Map<number, ActivityDetails>();
+  for (const { line, d } of pairs) {
+    if (matches.has(line) || used.has(d.id)) continue;
+    used.add(d.id);
+    matches.set(line, d);
+  }
+  return matches;
 }

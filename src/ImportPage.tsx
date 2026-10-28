@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import type {
   Account,
   ActivityCreate,
+  ActivityDetails,
   ActivityImport,
   ActivityUpdate,
   AddonContext,
@@ -22,7 +23,7 @@ import Papa from "papaparse";
 import { loadSettings, saveSettings } from "./settings";
 import { SecurityMappingStep } from "./SecurityMappingStep";
 import type { SecurityInfo, SecurityMapping } from "./SecurityMappingStep";
-import { transform } from "./transform";
+import { matchBankDeposits, transform } from "./transform";
 import type { ActivityImportEx, AddonSettings, SkippedRow, TransformResult, TrRow } from "./types";
 
 // ─── helpers ────────────────────────────────────────────────────────────────
@@ -174,11 +175,17 @@ function ActivityRow({
   accountName,
   included,
   onToggleInclude,
+  bankDeposit,
+  replacing,
+  onToggleReplace,
 }: {
   activity: ActivityImport;
   accountName: (id: string) => string;
   included: boolean;
   onToggleInclude: () => void;
+  bankDeposit?: ActivityDetails;
+  replacing: boolean;
+  onToggleReplace: () => void;
 }) {
   const status = activityStatus(activity);
   return (
@@ -197,7 +204,27 @@ function ActivityRow({
         {displayAmount(activity)}
       </td>
       <td className="px-2 py-1.5 text-xs">
-        {status === "valid" && <span className="text-muted-foreground text-[10px]">Ready</span>}
+        {status === "valid" && !bankDeposit && (
+          <span className="text-muted-foreground text-[10px]">Ready</span>
+        )}
+        {status === "valid" && bankDeposit && (
+          <div className="flex items-center gap-1.5">
+            <span
+              className="rounded bg-blue-100 px-1.5 py-0.5 text-[10px] font-medium text-blue-800 dark:bg-blue-900/30 dark:text-blue-400"
+              title={bankDeposit.comment ?? ""}
+            >
+              {replacing
+                ? `Replaces bank deposit ${fmtDate(String(bankDeposit.date)).slice(0, 10)}`
+                : "New (bank deposit kept)"}
+            </span>
+            <button
+              onClick={onToggleReplace}
+              className="text-muted-foreground hover:text-foreground rounded px-1.5 py-0.5 text-[10px] font-medium transition-colors"
+            >
+              {replacing ? "Keep both" : "Replace"}
+            </button>
+          </div>
+        )}
         {status === "duplicate" && (
           <div className="flex items-center gap-1.5">
             <span className="rounded bg-yellow-100 px-1.5 py-0.5 text-[10px] font-medium text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400">
@@ -241,6 +268,10 @@ export function ImportPage({ ctx }: { ctx: AddonContext }) {
   const [checked, setChecked] = useState<ActivityImport[] | null>(null);
   const [excludedLines, setExcludedLines] = useState<Set<number>>(new Set());
   const [showDuplicatesOnly, setShowDuplicatesOnly] = useState(false);
+  // Pattern TRANSFER_IN lineNumber -> DEPOSIT the bank sync already imported for the same money
+  const [bankMatches, setBankMatches] = useState<Map<number, ActivityDetails>>(new Map());
+  const [keepBothLines, setKeepBothLines] = useState<Set<number>>(new Set());
+  const [bankLookupError, setBankLookupError] = useState("");
 
   const [fileError, setFileError] = useState("");
   const [checkError, setCheckError] = useState("");
@@ -266,20 +297,53 @@ export function ImportPage({ ctx }: { ctx: AddonContext }) {
 
   // ── Apply symbol mappings and run checkImport ─────────────────────────────
 
+  // Bank-sync DEPOSITs on the pattern destination accounts this file transfers to (see matchBankDeposits)
+  const findBankMatches = useCallback(
+    async (activities: ActivityImport[]) => {
+      setBankMatches(new Map());
+      setKeepBothLines(new Set());
+      setBankLookupError("");
+      if (!settings) return;
+      const internal = [settings.cashAccountId, settings.portfolioAccountId];
+      const accountIds = [
+        ...new Set(
+          activities
+            .filter((a) => a.activityType === "TRANSFER_IN" && !internal.includes(a.accountId))
+            .map((a) => a.accountId),
+        ),
+      ];
+      if (accountIds.length === 0) return;
+      try {
+        const res = await ctx.api.activities.search(
+          0,
+          1000,
+          { accountIds, activityTypes: ["DEPOSIT"] },
+          "",
+          { id: "date", desc: true },
+        );
+        setBankMatches(matchBankDeposits(activities, res.data, settings));
+      } catch (e) {
+        setBankLookupError(String(e));
+      }
+    },
+    [ctx, settings],
+  );
+
   const runCheckImport = useCallback(
     async (activities: ActivityImport[]) => {
       setStep("checking");
+      let validated: ActivityImport[];
       try {
-        const validated = await ctx.api.activities.checkImport(activities);
-        setChecked(validated);
-        setStep("confirm");
+        validated = await ctx.api.activities.checkImport(activities);
       } catch (e) {
         setCheckError(String(e));
-        setChecked(activities);
-        setStep("confirm");
+        validated = activities;
       }
+      await findBankMatches(validated);
+      setChecked(validated);
+      setStep("confirm");
     },
-    [ctx],
+    [ctx, findBankMatches],
   );
 
   const handleMappingsComplete = useCallback(
@@ -377,6 +441,15 @@ export function ImportPage({ ctx }: { ctx: AddonContext }) {
     });
   }, []);
 
+  const toggleKeepBoth = useCallback((lineNumber: number) => {
+    setKeepBothLines((prev) => {
+      const next = new Set(prev);
+      if (next.has(lineNumber)) next.delete(lineNumber);
+      else next.add(lineNumber);
+      return next;
+    });
+  }, []);
+
   const toggleAllDuplicates = useCallback(
     (duplicates: ActivityImport[]) => {
       const lines = duplicates
@@ -440,11 +513,18 @@ export function ImportPage({ ctx }: { ctx: AddonContext }) {
               }
             : undefined;
 
+        // The bank sync already imported this money as a DEPOSIT: turn that into the TRANSFER_IN
+        const bankDeposit =
+          a.lineNumber != null && !keepBothLines.has(a.lineNumber)
+            ? bankMatches.get(a.lineNumber)
+            : undefined;
+        const existingId = activityStatus(a) === "duplicate" ? a.duplicateOfId : bankDeposit?.id;
+
         try {
-          if (activityStatus(a) === "duplicate" && a.duplicateOfId) {
+          if (existingId) {
             // Activity already exists — update it so re-imports succeed without duplicating.
             const upd: ActivityUpdate = {
-              id: a.duplicateOfId,
+              id: existingId,
               accountId: a.accountId,
               activityType: a.activityType,
               subtype: a.subtype,
@@ -511,7 +591,7 @@ export function ImportPage({ ctx }: { ctx: AddonContext }) {
       setCheckError(String(e));
       setStep("confirm");
     }
-  }, [checked, excludedLines, ctx, parseResult]);
+  }, [checked, excludedLines, ctx, parseResult, bankMatches, keepBothLines]);
 
   // ── Reset ─────────────────────────────────────────────────────────────────
 
@@ -524,6 +604,9 @@ export function ImportPage({ ctx }: { ctx: AddonContext }) {
     setChecked(null);
     setExcludedLines(new Set());
     setShowDuplicatesOnly(false);
+    setBankMatches(new Map());
+    setKeepBothLines(new Set());
+    setBankLookupError("");
     setFileError("");
     setCheckError("");
     setImportResult(null);
@@ -666,6 +749,13 @@ export function ImportPage({ ctx }: { ctx: AddonContext }) {
                 Validation warning: {checkError} — review manually.
               </p>
             )}
+            {bankLookupError && (
+              <p className="text-destructive mt-1 text-xs">
+                Could not look for deposits already imported by the bank sync ({bankLookupError}).
+                Transfers will be created as new activities — check the destination accounts for
+                duplicates.
+              </p>
+            )}
           </div>
           <div className="flex gap-2">
             <Button
@@ -696,6 +786,19 @@ export function ImportPage({ ctx }: { ctx: AddonContext }) {
                 ? "Include all"
                 : "Skip all"}
             </button>
+          </div>
+        )}
+
+        {/* Bank-sync banner */}
+        {bankMatches.size > 0 && (
+          <div className="bg-muted rounded-lg px-4 py-3 text-sm">
+            <span className="font-medium">
+              {bankMatches.size - keepBothLines.size} transfer
+              {bankMatches.size - keepBothLines.size !== 1 ? "s" : ""}
+            </span>{" "}
+            will <strong>replace</strong> the deposit the bank sync already imported for the same
+            money (same account and amount, within 5 days). Use "Keep both" on a row if it is a
+            different movement.
           </div>
         )}
 
@@ -748,6 +851,11 @@ export function ImportPage({ ctx }: { ctx: AddonContext }) {
                           included={a.lineNumber == null || !excludedLines.has(a.lineNumber)}
                           onToggleInclude={() =>
                             a.lineNumber != null && toggleExclude(a.lineNumber)
+                          }
+                          bankDeposit={a.lineNumber != null ? bankMatches.get(a.lineNumber) : undefined}
+                          replacing={a.lineNumber == null || !keepBothLines.has(a.lineNumber)}
+                          onToggleReplace={() =>
+                            a.lineNumber != null && toggleKeepBoth(a.lineNumber)
                           }
                         />
                       ))}

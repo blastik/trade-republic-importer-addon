@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.4.0] - 2026-10-28
+
+### Added
+
+- Transfers to a pattern's destination account now replace the deposit a bank sync already imported for the same money (activities with `sourceSystem` `ENABLE_BANKING`). A pattern `TRANSFER_IN` matches a `DEPOSIT` on the same account with the same amount and currency booked within 5 calendar days; the review screen shows each match ("Replaces bank deposit …") with a "Keep both" toggle, and the import turns that deposit into the linked `TRANSFER_IN` instead of creating a second activity. Needs the `activities.search` permission.
+
 ## [1.3.3] - 2026-08-24
 
 ### Changed

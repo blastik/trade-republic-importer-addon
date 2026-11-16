@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.4.1] - 2026-11-16
+
+### Fixed
+
+- Internal transfers whose legs were updated instead of created are now linked. Wealthfolio's activity update doesn't change an activity's transfer group, so a pattern `TRANSFER_IN` that replaced an existing deposit (see "Deposits already imported on the destination account" in the README), or a transfer re-imported over existing activities, could end up with one leg unlinked. Wealthfolio then reported it as an incomplete transfer and counted it as income and spending. After saving, the import now links each such `TRANSFER_OUT`/`TRANSFER_IN` pair explicitly, and re-importing a CSV repairs pairs left unlinked by earlier versions. Needs the `activities.linkTransfer` permission; Wealthfolio asks you to approve it when you update the addon. Pairs that can't be linked are counted on the result screen so you can link them by hand.
+
+### Changed
+
+- A pattern `TRANSFER_IN` now replaces a matching `DEPOSIT` from any import or sync source (a bank connection such as SimpleFIN, a bank CSV import, a custom integration), not only one source. Deposits entered by hand are still never replaced, and the review screen still lists every match with its "Keep both" toggle.
+
 ## [1.4.0] - 2026-10-28
 
 ### Added

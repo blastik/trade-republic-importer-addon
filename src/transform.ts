@@ -568,25 +568,30 @@ export function transform(rows: TrRow[], config: AddonSettings): TransformResult
   return { activities, skipped };
 }
 
-// ─── Bank-sync deposits ──────────────────────────────────────────────────────
+// ─── Deposits already imported from the destination bank ─────────────────────
 //
-// A bank sync (activities with sourceSystem ENABLE_BANKING) may import the destination bank's movements more often
-// than this CSV is imported, so the credit for a matched transfer pattern can already be in Wealthfolio as a DEPOSIT.
-// Not every bank reports the sender of a transfer, so the sync can't always tell it came from Trade Republic.
+// The destination account may get its movements from another source (a bank connection such as SimpleFIN, a bank CSV
+// import, a custom sync) more often than this CSV is imported, so the credit for a matched transfer pattern can
+// already be in Wealthfolio as a DEPOSIT. Most bank feeds don't say the money came from Trade Republic.
 // The pattern's TRANSFER_IN then replaces that DEPOSIT (same account, amount and currency, booked within
-// BANK_MATCH_DAYS) instead of creating a second activity for the same money.
-export const BANK_SYNC_SOURCE = "ENABLE_BANKING";
+// BANK_MATCH_DAYS) instead of creating a second activity for the same money. Only imported or synced deposits are
+// candidates: ones entered by hand (sourceSystem MANUAL, or none) are left alone.
+export const NON_IMPORTED_SOURCES = ["MANUAL", "GENERATED"];
+export const isImportedDeposit = (d: ActivityDetails): boolean =>
+  d.activityType === "DEPOSIT" &&
+  !!d.sourceSystem &&
+  !NON_IMPORTED_SOURCES.includes(d.sourceSystem.toUpperCase());
 export const BANK_MATCH_DAYS = 5;
 
 const cents = (v: string | number | null | undefined): number => Math.round(Math.abs(Number(v ?? 0)) * 100);
-// Calendar days between two dates (the bank sync books at noon, TR keeps the exact time)
+// Calendar days between two dates (bank feeds often book at noon or midnight, TR keeps the exact time)
 const dayDiff = (a: Date | string | undefined, b: Date | string | undefined): number => {
   const day = (v: Date | string | undefined) => Date.parse(new Date(v ?? 0).toISOString().slice(0, 10));
   return Math.abs(day(a) - day(b)) / 86_400_000;
 };
 
 // activities: checkImport output; deposits: existing activities on the destination accounts.
-// -> lineNumber of each pattern TRANSFER_IN -> the bank-sync DEPOSIT it replaces. Closest dates pair first and each
+// -> lineNumber of each pattern TRANSFER_IN -> the imported DEPOSIT it replaces. Closest dates pair first and each
 // deposit is used once, so two equal transfers a few days apart each get their own deposit.
 export function matchBankDeposits(
   activities: ActivityImport[],
@@ -601,9 +606,7 @@ export function matchBankDeposits(
       a.accountId !== config.cashAccountId &&
       a.accountId !== config.portfolioAccountId,
   );
-  const candidates = deposits.filter(
-    (d) => d.activityType === "DEPOSIT" && d.sourceSystem === BANK_SYNC_SOURCE,
-  );
+  const candidates = deposits.filter(isImportedDeposit);
   const pairs = transfers
     .flatMap((a) =>
       candidates
@@ -625,4 +628,35 @@ export function matchBankDeposits(
     matches.set(line, d);
   }
   return matches;
+}
+
+// ─── Re-linking updated transfer legs ────────────────────────────────────────
+//
+// Wealthfolio's activity update ignores sourceGroupId, so a transfer leg written through update() (a re-imported
+// duplicate, or an existing deposit turned into a TRANSFER_IN) keeps whatever link it had before. Its other leg may
+// then sit alone in the group, which Wealthfolio reports as an incomplete transfer and counts as spending/income.
+// After an import, every group with an updated leg is linked explicitly through the host's linkTransfer.
+export interface WrittenTransferLeg {
+  groupId: string;
+  activityType: string;
+  activityId: string;
+  updated: boolean;
+}
+
+// -> [TRANSFER_OUT id, TRANSFER_IN id] for each group that has exactly one leg of each and at least one updated leg.
+export function transferPairsToLink(legs: WrittenTransferLeg[]): [string, string][] {
+  const groups = new Map<string, WrittenTransferLeg[]>();
+  for (const leg of legs) {
+    if (leg.activityType !== "TRANSFER_OUT" && leg.activityType !== "TRANSFER_IN") continue;
+    groups.set(leg.groupId, [...(groups.get(leg.groupId) ?? []), leg]);
+  }
+  const pairs: [string, string][] = [];
+  for (const group of groups.values()) {
+    const outs = group.filter((l) => l.activityType === "TRANSFER_OUT");
+    const ins = group.filter((l) => l.activityType === "TRANSFER_IN");
+    if (outs.length !== 1 || ins.length !== 1) continue;
+    if (!outs[0].updated && !ins[0].updated) continue;
+    pairs.push([outs[0].activityId, ins[0].activityId]);
+  }
+  return pairs;
 }

@@ -23,7 +23,8 @@ import Papa from "papaparse";
 import { loadSettings, saveSettings } from "./settings";
 import { SecurityMappingStep } from "./SecurityMappingStep";
 import type { SecurityInfo, SecurityMapping } from "./SecurityMappingStep";
-import { matchBankDeposits, transform } from "./transform";
+import { matchBankDeposits, transferPairsToLink, transform } from "./transform";
+import type { WrittenTransferLeg } from "./transform";
 import type { ActivityImportEx, AddonSettings, SkippedRow, TransformResult, TrRow } from "./types";
 
 // ─── helpers ────────────────────────────────────────────────────────────────
@@ -214,7 +215,7 @@ function ActivityRow({
               title={bankDeposit.comment ?? ""}
             >
               {replacing
-                ? `Replaces bank deposit ${fmtDate(String(bankDeposit.date)).slice(0, 10)}`
+                ? `Replaces deposit ${fmtDate(String(bankDeposit.date)).slice(0, 10)}`
                 : "New (bank deposit kept)"}
             </span>
             <button
@@ -268,7 +269,7 @@ export function ImportPage({ ctx }: { ctx: AddonContext }) {
   const [checked, setChecked] = useState<ActivityImport[] | null>(null);
   const [excludedLines, setExcludedLines] = useState<Set<number>>(new Set());
   const [showDuplicatesOnly, setShowDuplicatesOnly] = useState(false);
-  // Pattern TRANSFER_IN lineNumber -> DEPOSIT the bank sync already imported for the same money
+  // Pattern TRANSFER_IN lineNumber -> imported DEPOSIT already on that account for the same money
   const [bankMatches, setBankMatches] = useState<Map<number, ActivityDetails>>(new Map());
   const [keepBothLines, setKeepBothLines] = useState<Set<number>>(new Set());
   const [bankLookupError, setBankLookupError] = useState("");
@@ -277,6 +278,7 @@ export function ImportPage({ ctx }: { ctx: AddonContext }) {
   const [checkError, setCheckError] = useState("");
   const [importProgress, setImportProgress] = useState(0);
   const [importResult, setImportResult] = useState<ImportActivitiesResult | null>(null);
+  const [linkFailures, setLinkFailures] = useState(0);
 
   useEffect(() => {
     Promise.all([loadSettings(ctx), ctx.api.accounts.getAll()]).then(([s, accs]) => {
@@ -297,7 +299,7 @@ export function ImportPage({ ctx }: { ctx: AddonContext }) {
 
   // ── Apply symbol mappings and run checkImport ─────────────────────────────
 
-  // Bank-sync DEPOSITs on the pattern destination accounts this file transfers to (see matchBankDeposits)
+  // Imported DEPOSITs on the pattern destination accounts this file transfers to (see matchBankDeposits)
   const findBankMatches = useCallback(
     async (activities: ActivityImport[]) => {
       setBankMatches(new Map());
@@ -495,6 +497,7 @@ export function ImportPage({ ctx }: { ctx: AddonContext }) {
 
     let importedCount = 0;
     let skippedCount = 0;
+    const writtenLegs: WrittenTransferLeg[] = [];
     try {
       for (let i = 0; i < candidates.length; i++) {
         const a = candidates[i];
@@ -513,7 +516,7 @@ export function ImportPage({ ctx }: { ctx: AddonContext }) {
               }
             : undefined;
 
-        // The bank sync already imported this money as a DEPOSIT: turn that into the TRANSFER_IN
+        // This money was already imported as a DEPOSIT on the destination account: turn that into the TRANSFER_IN
         const bankDeposit =
           a.lineNumber != null && !keepBothLines.has(a.lineNumber)
             ? bankMatches.get(a.lineNumber)
@@ -540,6 +543,14 @@ export function ImportPage({ ctx }: { ctx: AddonContext }) {
               sourceGroupId,
             };
             await ctx.api.activities.update(upd);
+            if (sourceGroupId) {
+              writtenLegs.push({
+                groupId: sourceGroupId,
+                activityType: a.activityType,
+                activityId: existingId,
+                updated: true,
+              });
+            }
           } else {
             const cre: ActivityCreate = {
               accountId: a.accountId,
@@ -556,7 +567,15 @@ export function ImportPage({ ctx }: { ctx: AddonContext }) {
               asset: assetInput,
               sourceGroupId,
             };
-            await ctx.api.activities.create(cre);
+            const created = await ctx.api.activities.create(cre);
+            if (sourceGroupId && created?.id) {
+              writtenLegs.push({
+                groupId: sourceGroupId,
+                activityType: a.activityType,
+                activityId: created.id,
+                updated: false,
+              });
+            }
           }
           importedCount++;
         } catch {
@@ -564,6 +583,17 @@ export function ImportPage({ ctx }: { ctx: AddonContext }) {
         }
         setImportProgress(Math.round(((i + 1) / candidates.length) * 95) + 2);
       }
+
+      // Updates don't carry sourceGroupId, so link each pair with an updated leg explicitly
+      let linkFailedCount = 0;
+      for (const [outId, inId] of transferPairsToLink(writtenLegs)) {
+        try {
+          await ctx.api.activities.linkTransfer(outId, inId);
+        } catch {
+          linkFailedCount++;
+        }
+      }
+      setLinkFailures(linkFailedCount);
       setImportProgress(100);
 
       const syntheticResult: ImportActivitiesResult = {
@@ -610,6 +640,7 @@ export function ImportPage({ ctx }: { ctx: AddonContext }) {
     setFileError("");
     setCheckError("");
     setImportResult(null);
+    setLinkFailures(0);
     setImportProgress(0);
   }, []);
 
@@ -751,7 +782,7 @@ export function ImportPage({ ctx }: { ctx: AddonContext }) {
             )}
             {bankLookupError && (
               <p className="text-destructive mt-1 text-xs">
-                Could not look for deposits already imported by the bank sync ({bankLookupError}).
+                Could not look for deposits already imported on the destination accounts ({bankLookupError}).
                 Transfers will be created as new activities — check the destination accounts for
                 duplicates.
               </p>
@@ -789,15 +820,15 @@ export function ImportPage({ ctx }: { ctx: AddonContext }) {
           </div>
         )}
 
-        {/* Bank-sync banner */}
+        {/* Imported-deposit banner */}
         {bankMatches.size > 0 && (
           <div className="bg-muted rounded-lg px-4 py-3 text-sm">
             <span className="font-medium">
               {bankMatches.size - keepBothLines.size} transfer
               {bankMatches.size - keepBothLines.size !== 1 ? "s" : ""}
             </span>{" "}
-            will <strong>replace</strong> the deposit the bank sync already imported for the same
-            money (same account and amount, within 5 days). Use "Keep both" on a row if it is a
+            will <strong>replace</strong> a deposit already imported on the destination account for
+            the same money (same account and amount, within 5 days). Use "Keep both" on a row if it is a
             different movement.
           </div>
         )}
@@ -949,6 +980,14 @@ export function ImportPage({ ctx }: { ctx: AddonContext }) {
           <p className="text-muted-foreground text-sm">
             {summary.skipped ?? 0} activit{(summary.skipped ?? 0) === 1 ? "y" : "ies"} could not
             be saved. They may already exist or contain invalid data.
+          </p>
+        )}
+
+        {linkFailures > 0 && (
+          <p className="text-muted-foreground text-sm">
+            {linkFailures} transfer pair{linkFailures === 1 ? "" : "s"} could not be linked. Link{" "}
+            {linkFailures === 1 ? "it" : "them"} manually in Wealthfolio so{" "}
+            {linkFailures === 1 ? "it isn't" : "they aren't"} counted as income and spending.
           </p>
         )}
 

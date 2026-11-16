@@ -3,7 +3,7 @@ import { dirname, join } from "path";
 import { fileURLToPath } from "url";
 import Papa from "papaparse";
 import { describe, expect, it } from "vitest";
-import { BANK_SYNC_SOURCE, matchBankDeposits, transform } from "./transform";
+import { matchBankDeposits, transform, transferPairsToLink } from "./transform";
 import type { ActivityDetails, ActivityImport } from "@wealthfolio/addon-sdk";
 import type { AddonSettings, TrRow } from "./types";
 
@@ -640,7 +640,7 @@ describe("matchBankDeposits", () => {
     ...CONFIG,
     transferPatterns: [{ iban: "DE00SAVINGS", label: "Savings", destinationAccountId: "savings" }],
   };
-  // A TR outbound transfer whose arrival on the savings account a bank sync already imported as a DEPOSIT
+  // A TR outbound transfer whose arrival on the savings account was already imported (e.g. by a bank sync) as a DEPOSIT
   const trTransfer = row({
     datetime: "2024-03-10T08:01:02.123456Z",
     date: "2024-03-10",
@@ -660,11 +660,11 @@ describe("matchBankDeposits", () => {
       date: "2024-03-10T12:00:00+00:00" as unknown as Date,
       amount: "500.00",
       currency: "EUR",
-      sourceSystem: BANK_SYNC_SOURCE,
+      sourceSystem: "SIMPLEFIN",
       ...overrides,
     }) as ActivityDetails;
 
-  it("links a pattern TRANSFER_IN to the bank-sync DEPOSIT for the same money", () => {
+  it("links a pattern TRANSFER_IN to the imported DEPOSIT for the same money", () => {
     const a = transferIn();
     const matches = matchBankDeposits([a], [deposit()], config);
     expect(matches.get(a.lineNumber!)?.id).toBe("dep-1");
@@ -677,7 +677,14 @@ describe("matchBankDeposits", () => {
     expect(matchBankDeposits([a], [deposit({ date: "2024-03-16T12:00:00Z" as unknown as Date })], config).size).toBe(0);
   });
 
-  it("needs the same account, amount and currency, and a DEPOSIT from the bank sync", () => {
+  it("accepts deposits from any import or sync source", () => {
+    const a = transferIn();
+    for (const sourceSystem of ["SIMPLEFIN", "CSV", "SNAPTRADE", "ENABLE_BANKING", "my-custom-sync"]) {
+      expect(matchBankDeposits([a], [deposit({ sourceSystem })], config).size).toBe(1);
+    }
+  });
+
+  it("needs the same account, amount and currency, and an imported (not hand-entered) DEPOSIT", () => {
     const a = transferIn();
     for (const d of [
       deposit({ accountId: "other" }),
@@ -686,6 +693,8 @@ describe("matchBankDeposits", () => {
       deposit({ activityType: "TRANSFER_IN" }),
       deposit({ sourceSystem: undefined }),
       deposit({ sourceSystem: "MANUAL" }),
+      deposit({ sourceSystem: "manual" }),
+      deposit({ sourceSystem: "" }),
     ]) {
       expect(matchBankDeposits([a], [d], config).size).toBe(0);
     }
@@ -706,5 +715,51 @@ describe("matchBankDeposits", () => {
     const reimport = { ...transferIn(), duplicateOfId: "existing" };
     expect(matchBankDeposits([internal], [deposit({ accountId: "cash" })], config).size).toBe(0);
     expect(matchBankDeposits([reimport], [deposit()], config).size).toBe(0);
+  });
+});
+
+describe("transferPairsToLink", () => {
+  const leg = (groupId: string, activityType: string, activityId: string, updated = false) => ({
+    groupId,
+    activityType,
+    activityId,
+    updated,
+  });
+
+  it("links a pair whose TRANSFER_IN replaced an existing deposit", () => {
+    expect(
+      transferPairsToLink([leg("g1", "TRANSFER_OUT", "out-1"), leg("g1", "TRANSFER_IN", "dep-1", true)]),
+    ).toEqual([["out-1", "dep-1"]]);
+  });
+
+  it("links a re-imported pair where both legs were updated", () => {
+    expect(
+      transferPairsToLink([leg("g1", "TRANSFER_IN", "in-1", true), leg("g1", "TRANSFER_OUT", "out-1", true)]),
+    ).toEqual([["out-1", "in-1"]]);
+  });
+
+  it("leaves pairs created from scratch alone (create already sets the group)", () => {
+    expect(
+      transferPairsToLink([leg("g1", "TRANSFER_OUT", "out-1"), leg("g1", "TRANSFER_IN", "in-1")]),
+    ).toEqual([]);
+  });
+
+  it("skips groups missing a leg (e.g. one side failed or was excluded)", () => {
+    expect(transferPairsToLink([leg("g1", "TRANSFER_IN", "in-1", true)])).toEqual([]);
+  });
+
+  it("ignores non-transfer rows and keeps groups apart", () => {
+    expect(
+      transferPairsToLink([
+        leg("g1", "TRANSFER_OUT", "out-1"),
+        leg("g1", "BUY", "buy-1", true),
+        leg("g1", "TRANSFER_IN", "in-1", true),
+        leg("g2", "TRANSFER_OUT", "out-2", true),
+        leg("g2", "TRANSFER_IN", "in-2"),
+      ]),
+    ).toEqual([
+      ["out-1", "in-1"],
+      ["out-2", "in-2"],
+    ]);
   });
 });

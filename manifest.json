@@ -1,7 +1,7 @@
 {
   "id": "trade-republic-importer",
   "name": "Trade Republic Importer",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "description": "Import Trade Republic CSV exports into Wealthfolio. Splits cash and portfolio activities across two accounts and handles internal fund transfers automatically.",
   "author": "blastik",
   "main": "dist/addon.js",
@@ -27,9 +27,10 @@
         { "name": "search", "isDeclared": true, "isDetected": false },
         { "name": "saveMany", "isDeclared": true, "isDetected": false },
         { "name": "create", "isDeclared": true, "isDetected": false },
-        { "name": "update", "isDeclared": true, "isDetected": false }
+        { "name": "update", "isDeclared": true, "isDetected": false },
+        { "name": "linkTransfer", "isDeclared": true, "isDetected": false }
       ],
-      "purpose": "Validate and import activities parsed from the Trade Republic CSV, and find deposits a bank sync already imported for the same transfers"
+      "purpose": "Validate and import activities parsed from the Trade Republic CSV, find deposits already imported on the destination accounts for the same transfers, and link both legs of each internal transfer"
     },
     {
       "category": "assets",

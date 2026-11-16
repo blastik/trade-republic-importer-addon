@@ -64,15 +64,18 @@ Example: an IBAN `DE89 3704 0044 0532 0130 00` with label `Investment` will mark
 inbound transfers from that IBAN as a TRANSFER linked to a destination account
 of your choice.
 
-### Deposits already imported by a bank sync
+### Deposits already imported on the destination account
 
-If a bank sync (anything that writes activities with `sourceSystem`
-`ENABLE_BANKING`) already imported the money arriving at a pattern's destination account as a
-`DEPOSIT`, the import replaces that deposit with the pattern's `TRANSFER_IN`
-instead of adding a second activity. A deposit matches when it is on the same
-account, with the same amount and currency, booked within 5 calendar days of
-the Trade Republic transfer. The review screen marks each match as "Replaces
-bank deposit"; use "Keep both" on a row if it is a different movement.
+The destination account may already have the money as a `DEPOSIT` before you
+import the Trade Republic CSV, for example from a bank connection (SimpleFIN or
+another sync) or a bank statement CSV, since most banks don't report that the
+transfer came from Trade Republic. The import then replaces that deposit with
+the pattern's `TRANSFER_IN` instead of adding a second activity for the same
+money. A deposit matches when it is on the same account, with the same amount
+and currency, booked within 5 calendar days of the Trade Republic transfer.
+Only imported or synced deposits are considered; deposits you entered by hand
+are left alone. The review screen marks each match as "Replaces deposit"; use
+"Keep both" on a row if it is a different movement.
 
 After saving, the importer links the deposit it replaced to the Trade Republic
 `TRANSFER_OUT`, so Wealthfolio treats the pair as one internal transfer.

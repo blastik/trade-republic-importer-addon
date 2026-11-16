@@ -3,7 +3,7 @@ import { dirname, join } from "path";
 import { fileURLToPath } from "url";
 import Papa from "papaparse";
 import { describe, expect, it } from "vitest";
-import { BANK_SYNC_SOURCE, matchBankDeposits, transform, transferPairsToLink } from "./transform";
+import { matchBankDeposits, transform, transferPairsToLink } from "./transform";
 import type { ActivityDetails, ActivityImport } from "@wealthfolio/addon-sdk";
 import type { AddonSettings, TrRow } from "./types";
 
@@ -640,7 +640,7 @@ describe("matchBankDeposits", () => {
     ...CONFIG,
     transferPatterns: [{ iban: "DE00SAVINGS", label: "Savings", destinationAccountId: "savings" }],
   };
-  // A TR outbound transfer whose arrival on the savings account a bank sync already imported as a DEPOSIT
+  // A TR outbound transfer whose arrival on the savings account was already imported (e.g. by a bank sync) as a DEPOSIT
   const trTransfer = row({
     datetime: "2024-03-10T08:01:02.123456Z",
     date: "2024-03-10",
@@ -660,11 +660,11 @@ describe("matchBankDeposits", () => {
       date: "2024-03-10T12:00:00+00:00" as unknown as Date,
       amount: "500.00",
       currency: "EUR",
-      sourceSystem: BANK_SYNC_SOURCE,
+      sourceSystem: "SIMPLEFIN",
       ...overrides,
     }) as ActivityDetails;
 
-  it("links a pattern TRANSFER_IN to the bank-sync DEPOSIT for the same money", () => {
+  it("links a pattern TRANSFER_IN to the imported DEPOSIT for the same money", () => {
     const a = transferIn();
     const matches = matchBankDeposits([a], [deposit()], config);
     expect(matches.get(a.lineNumber!)?.id).toBe("dep-1");
@@ -677,7 +677,14 @@ describe("matchBankDeposits", () => {
     expect(matchBankDeposits([a], [deposit({ date: "2024-03-16T12:00:00Z" as unknown as Date })], config).size).toBe(0);
   });
 
-  it("needs the same account, amount and currency, and a DEPOSIT from the bank sync", () => {
+  it("accepts deposits from any import or sync source", () => {
+    const a = transferIn();
+    for (const sourceSystem of ["SIMPLEFIN", "CSV", "SNAPTRADE", "ENABLE_BANKING", "my-custom-sync"]) {
+      expect(matchBankDeposits([a], [deposit({ sourceSystem })], config).size).toBe(1);
+    }
+  });
+
+  it("needs the same account, amount and currency, and an imported (not hand-entered) DEPOSIT", () => {
     const a = transferIn();
     for (const d of [
       deposit({ accountId: "other" }),
@@ -686,6 +693,8 @@ describe("matchBankDeposits", () => {
       deposit({ activityType: "TRANSFER_IN" }),
       deposit({ sourceSystem: undefined }),
       deposit({ sourceSystem: "MANUAL" }),
+      deposit({ sourceSystem: "manual" }),
+      deposit({ sourceSystem: "" }),
     ]) {
       expect(matchBankDeposits([a], [d], config).size).toBe(0);
     }

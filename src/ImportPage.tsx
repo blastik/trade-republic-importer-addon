@@ -215,7 +215,7 @@ function ActivityRow({
               title={bankDeposit.comment ?? ""}
             >
               {replacing
-                ? `Replaces bank deposit ${fmtDate(String(bankDeposit.date)).slice(0, 10)}`
+                ? `Replaces deposit ${fmtDate(String(bankDeposit.date)).slice(0, 10)}`
                 : "New (bank deposit kept)"}
             </span>
             <button
@@ -269,7 +269,7 @@ export function ImportPage({ ctx }: { ctx: AddonContext }) {
   const [checked, setChecked] = useState<ActivityImport[] | null>(null);
   const [excludedLines, setExcludedLines] = useState<Set<number>>(new Set());
   const [showDuplicatesOnly, setShowDuplicatesOnly] = useState(false);
-  // Pattern TRANSFER_IN lineNumber -> DEPOSIT the bank sync already imported for the same money
+  // Pattern TRANSFER_IN lineNumber -> imported DEPOSIT already on that account for the same money
   const [bankMatches, setBankMatches] = useState<Map<number, ActivityDetails>>(new Map());
   const [keepBothLines, setKeepBothLines] = useState<Set<number>>(new Set());
   const [bankLookupError, setBankLookupError] = useState("");
@@ -299,7 +299,7 @@ export function ImportPage({ ctx }: { ctx: AddonContext }) {
 
   // ── Apply symbol mappings and run checkImport ─────────────────────────────
 
-  // Bank-sync DEPOSITs on the pattern destination accounts this file transfers to (see matchBankDeposits)
+  // Imported DEPOSITs on the pattern destination accounts this file transfers to (see matchBankDeposits)
   const findBankMatches = useCallback(
     async (activities: ActivityImport[]) => {
       setBankMatches(new Map());
@@ -516,7 +516,7 @@ export function ImportPage({ ctx }: { ctx: AddonContext }) {
               }
             : undefined;
 
-        // The bank sync already imported this money as a DEPOSIT: turn that into the TRANSFER_IN
+        // This money was already imported as a DEPOSIT on the destination account: turn that into the TRANSFER_IN
         const bankDeposit =
           a.lineNumber != null && !keepBothLines.has(a.lineNumber)
             ? bankMatches.get(a.lineNumber)
@@ -782,7 +782,7 @@ export function ImportPage({ ctx }: { ctx: AddonContext }) {
             )}
             {bankLookupError && (
               <p className="text-destructive mt-1 text-xs">
-                Could not look for deposits already imported by the bank sync ({bankLookupError}).
+                Could not look for deposits already imported on the destination accounts ({bankLookupError}).
                 Transfers will be created as new activities — check the destination accounts for
                 duplicates.
               </p>
@@ -820,15 +820,15 @@ export function ImportPage({ ctx }: { ctx: AddonContext }) {
           </div>
         )}
 
-        {/* Bank-sync banner */}
+        {/* Imported-deposit banner */}
         {bankMatches.size > 0 && (
           <div className="bg-muted rounded-lg px-4 py-3 text-sm">
             <span className="font-medium">
               {bankMatches.size - keepBothLines.size} transfer
               {bankMatches.size - keepBothLines.size !== 1 ? "s" : ""}
             </span>{" "}
-            will <strong>replace</strong> the deposit the bank sync already imported for the same
-            money (same account and amount, within 5 days). Use "Keep both" on a row if it is a
+            will <strong>replace</strong> a deposit already imported on the destination account for
+            the same money (same account and amount, within 5 days). Use "Keep both" on a row if it is a
             different movement.
           </div>
         )}

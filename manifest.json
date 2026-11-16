@@ -30,7 +30,7 @@
         { "name": "update", "isDeclared": true, "isDetected": false },
         { "name": "linkTransfer", "isDeclared": true, "isDetected": false }
       ],
-      "purpose": "Validate and import activities parsed from the Trade Republic CSV, find deposits a bank sync already imported for the same transfers, and link both legs of each internal transfer"
+      "purpose": "Validate and import activities parsed from the Trade Republic CSV, find deposits already imported on the destination accounts for the same transfers, and link both legs of each internal transfer"
     },
     {
       "category": "assets",

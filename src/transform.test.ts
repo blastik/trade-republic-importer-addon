@@ -3,7 +3,7 @@ import { dirname, join } from "path";
 import { fileURLToPath } from "url";
 import Papa from "papaparse";
 import { describe, expect, it } from "vitest";
-import { BANK_SYNC_SOURCE, matchBankDeposits, transform } from "./transform";
+import { BANK_SYNC_SOURCE, matchBankDeposits, transform, transferPairsToLink } from "./transform";
 import type { ActivityDetails, ActivityImport } from "@wealthfolio/addon-sdk";
 import type { AddonSettings, TrRow } from "./types";
 
@@ -706,5 +706,51 @@ describe("matchBankDeposits", () => {
     const reimport = { ...transferIn(), duplicateOfId: "existing" };
     expect(matchBankDeposits([internal], [deposit({ accountId: "cash" })], config).size).toBe(0);
     expect(matchBankDeposits([reimport], [deposit()], config).size).toBe(0);
+  });
+});
+
+describe("transferPairsToLink", () => {
+  const leg = (groupId: string, activityType: string, activityId: string, updated = false) => ({
+    groupId,
+    activityType,
+    activityId,
+    updated,
+  });
+
+  it("links a pair whose TRANSFER_IN replaced an existing deposit", () => {
+    expect(
+      transferPairsToLink([leg("g1", "TRANSFER_OUT", "out-1"), leg("g1", "TRANSFER_IN", "dep-1", true)]),
+    ).toEqual([["out-1", "dep-1"]]);
+  });
+
+  it("links a re-imported pair where both legs were updated", () => {
+    expect(
+      transferPairsToLink([leg("g1", "TRANSFER_IN", "in-1", true), leg("g1", "TRANSFER_OUT", "out-1", true)]),
+    ).toEqual([["out-1", "in-1"]]);
+  });
+
+  it("leaves pairs created from scratch alone (create already sets the group)", () => {
+    expect(
+      transferPairsToLink([leg("g1", "TRANSFER_OUT", "out-1"), leg("g1", "TRANSFER_IN", "in-1")]),
+    ).toEqual([]);
+  });
+
+  it("skips groups missing a leg (e.g. one side failed or was excluded)", () => {
+    expect(transferPairsToLink([leg("g1", "TRANSFER_IN", "in-1", true)])).toEqual([]);
+  });
+
+  it("ignores non-transfer rows and keeps groups apart", () => {
+    expect(
+      transferPairsToLink([
+        leg("g1", "TRANSFER_OUT", "out-1"),
+        leg("g1", "BUY", "buy-1", true),
+        leg("g1", "TRANSFER_IN", "in-1", true),
+        leg("g2", "TRANSFER_OUT", "out-2", true),
+        leg("g2", "TRANSFER_IN", "in-2"),
+      ]),
+    ).toEqual([
+      ["out-1", "in-1"],
+      ["out-2", "in-2"],
+    ]);
   });
 });

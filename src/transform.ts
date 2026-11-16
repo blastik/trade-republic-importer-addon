@@ -626,3 +626,34 @@ export function matchBankDeposits(
   }
   return matches;
 }
+
+// ─── Re-linking updated transfer legs ────────────────────────────────────────
+//
+// Wealthfolio's activity update ignores sourceGroupId, so a transfer leg written through update() (a re-imported
+// duplicate, or an existing deposit turned into a TRANSFER_IN) keeps whatever link it had before. Its other leg may
+// then sit alone in the group, which Wealthfolio reports as an incomplete transfer and counts as spending/income.
+// After an import, every group with an updated leg is linked explicitly through the host's linkTransfer.
+export interface WrittenTransferLeg {
+  groupId: string;
+  activityType: string;
+  activityId: string;
+  updated: boolean;
+}
+
+// -> [TRANSFER_OUT id, TRANSFER_IN id] for each group that has exactly one leg of each and at least one updated leg.
+export function transferPairsToLink(legs: WrittenTransferLeg[]): [string, string][] {
+  const groups = new Map<string, WrittenTransferLeg[]>();
+  for (const leg of legs) {
+    if (leg.activityType !== "TRANSFER_OUT" && leg.activityType !== "TRANSFER_IN") continue;
+    groups.set(leg.groupId, [...(groups.get(leg.groupId) ?? []), leg]);
+  }
+  const pairs: [string, string][] = [];
+  for (const group of groups.values()) {
+    const outs = group.filter((l) => l.activityType === "TRANSFER_OUT");
+    const ins = group.filter((l) => l.activityType === "TRANSFER_IN");
+    if (outs.length !== 1 || ins.length !== 1) continue;
+    if (!outs[0].updated && !ins[0].updated) continue;
+    pairs.push([outs[0].activityId, ins[0].activityId]);
+  }
+  return pairs;
+}

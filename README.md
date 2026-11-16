@@ -74,6 +74,9 @@ account, with the same amount and currency, booked within 5 calendar days of
 the Trade Republic transfer. The review screen marks each match as "Replaces
 bank deposit"; use "Keep both" on a row if it is a different movement.
 
+After saving, the importer links the deposit it replaced to the Trade Republic
+`TRANSFER_OUT`, so Wealthfolio treats the pair as one internal transfer.
+
 ## Notes
 
 - Currency is driven by the CSV. Cash activities use the corresponding currency
@@ -87,6 +90,10 @@ bank deposit"; use "Keep both" on a row if it is a different movement.
   uses to recognise it as an internal transfer rather than an expense. A
   Transfer Pattern left without a destination account (i.e. a genuine external
   transfer) is recorded as a plain `WITHDRAWAL` and correctly counts as spending.
+- Re-importing a CSV that overlaps a previous import updates the existing
+  activities instead of duplicating them. Transfer pairs among them are linked
+  again after saving, which also repairs pairs that an earlier version (before
+  1.4.1) left unlinked. This needs the `activities.linkTransfer` permission.
 
 ## Contributing
 

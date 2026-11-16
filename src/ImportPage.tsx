@@ -23,7 +23,8 @@ import Papa from "papaparse";
 import { loadSettings, saveSettings } from "./settings";
 import { SecurityMappingStep } from "./SecurityMappingStep";
 import type { SecurityInfo, SecurityMapping } from "./SecurityMappingStep";
-import { matchBankDeposits, transform } from "./transform";
+import { matchBankDeposits, transferPairsToLink, transform } from "./transform";
+import type { WrittenTransferLeg } from "./transform";
 import type { ActivityImportEx, AddonSettings, SkippedRow, TransformResult, TrRow } from "./types";
 
 // ─── helpers ────────────────────────────────────────────────────────────────
@@ -277,6 +278,7 @@ export function ImportPage({ ctx }: { ctx: AddonContext }) {
   const [checkError, setCheckError] = useState("");
   const [importProgress, setImportProgress] = useState(0);
   const [importResult, setImportResult] = useState<ImportActivitiesResult | null>(null);
+  const [linkFailures, setLinkFailures] = useState(0);
 
   useEffect(() => {
     Promise.all([loadSettings(ctx), ctx.api.accounts.getAll()]).then(([s, accs]) => {
@@ -495,6 +497,7 @@ export function ImportPage({ ctx }: { ctx: AddonContext }) {
 
     let importedCount = 0;
     let skippedCount = 0;
+    const writtenLegs: WrittenTransferLeg[] = [];
     try {
       for (let i = 0; i < candidates.length; i++) {
         const a = candidates[i];
@@ -540,6 +543,14 @@ export function ImportPage({ ctx }: { ctx: AddonContext }) {
               sourceGroupId,
             };
             await ctx.api.activities.update(upd);
+            if (sourceGroupId) {
+              writtenLegs.push({
+                groupId: sourceGroupId,
+                activityType: a.activityType,
+                activityId: existingId,
+                updated: true,
+              });
+            }
           } else {
             const cre: ActivityCreate = {
               accountId: a.accountId,
@@ -556,7 +567,15 @@ export function ImportPage({ ctx }: { ctx: AddonContext }) {
               asset: assetInput,
               sourceGroupId,
             };
-            await ctx.api.activities.create(cre);
+            const created = await ctx.api.activities.create(cre);
+            if (sourceGroupId && created?.id) {
+              writtenLegs.push({
+                groupId: sourceGroupId,
+                activityType: a.activityType,
+                activityId: created.id,
+                updated: false,
+              });
+            }
           }
           importedCount++;
         } catch {
@@ -564,6 +583,17 @@ export function ImportPage({ ctx }: { ctx: AddonContext }) {
         }
         setImportProgress(Math.round(((i + 1) / candidates.length) * 95) + 2);
       }
+
+      // Updates don't carry sourceGroupId, so link each pair with an updated leg explicitly
+      let linkFailedCount = 0;
+      for (const [outId, inId] of transferPairsToLink(writtenLegs)) {
+        try {
+          await ctx.api.activities.linkTransfer(outId, inId);
+        } catch {
+          linkFailedCount++;
+        }
+      }
+      setLinkFailures(linkFailedCount);
       setImportProgress(100);
 
       const syntheticResult: ImportActivitiesResult = {
@@ -610,6 +640,7 @@ export function ImportPage({ ctx }: { ctx: AddonContext }) {
     setFileError("");
     setCheckError("");
     setImportResult(null);
+    setLinkFailures(0);
     setImportProgress(0);
   }, []);
 
@@ -949,6 +980,14 @@ export function ImportPage({ ctx }: { ctx: AddonContext }) {
           <p className="text-muted-foreground text-sm">
             {summary.skipped ?? 0} activit{(summary.skipped ?? 0) === 1 ? "y" : "ies"} could not
             be saved. They may already exist or contain invalid data.
+          </p>
+        )}
+
+        {linkFailures > 0 && (
+          <p className="text-muted-foreground text-sm">
+            {linkFailures} transfer pair{linkFailures === 1 ? "" : "s"} could not be linked. Link{" "}
+            {linkFailures === 1 ? "it" : "them"} manually in Wealthfolio so{" "}
+            {linkFailures === 1 ? "it isn't" : "they aren't"} counted as income and spending.
           </p>
         )}
 
